@@ -38,6 +38,7 @@ class Provider:
         if not model:
             raise ValueError('Cần đặt MODEL là model có hỗ trợ tool calling.')
         self.name, self.model = name, model
+        self.max_tokens = None   # output cap; None = provider default (the agent sets a small cap on its own provider)
         # One Provider instance represents one conversation/run.
         self.session_id = str(uuid.uuid4()) if name == 'opencode-go' else None
         key_name, self.url = CONFIG[name]
@@ -49,6 +50,8 @@ class Provider:
         if self.name == 'anthropic':
             return self._anthropic(messages, schemas)
         payload = {'model': self.model, 'messages': messages}
+        if self.max_tokens:
+            payload['max_tokens'] = self.max_tokens
         if schemas:
             payload['tools'] = schemas
         headers = {'Authorization': f'Bearer {self.key}'}
@@ -82,7 +85,7 @@ class Provider:
             else:
                 native.append({'role': 'user', 'content': m['content']})
         tools = [{'name': x['function']['name'], 'description': x['function']['description'], 'input_schema': x['function']['parameters']} for x in schemas]
-        payload = {'model': self.model, 'max_tokens': 8192, 'system': system, 'messages': native}
+        payload = {'model': self.model, 'max_tokens': self.max_tokens or 8192, 'system': system, 'messages': native}
         if tools:
             payload['tools'] = tools
         data = post_json(self.url, {'x-api-key': self.key, 'anthropic-version': '2023-06-01'}, payload)

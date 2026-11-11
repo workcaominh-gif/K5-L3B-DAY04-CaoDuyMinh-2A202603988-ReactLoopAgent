@@ -1,0 +1,2 @@
+version,commit,files_changed,hypothesis,agent_model,judge_model,max_steps,score_0_100,missing_incident_url,model_calls,tool_calls,agent_input_tokens,agent_output_tokens,run_file
+v0,da5e031,agent.py,Baseline: ReAct loop with function calling and basic loop guardrails; the lab prompt,claude-sonnet-5-5,claude-sonnet-5-5,8,94.91,6/22,62,61,99849,33161,versions/v0/eval.json
