@@ -22,7 +22,7 @@ def run_case(case, args):
     if not isinstance(result, dict) or not isinstance(result.get('trace', []), list):
         result = {'status': 'error', 'answer': '', 'trace': [], 'usage': [], 'error': 'run_agent trả kết quả không hợp lệ.'}
     try:
-        judge = Provider(args.judge_provider, args.judge_model)
+        judge = Provider(args.judge_provider, args.judge_model, temperature=getattr(args, 'judge_temperature', None))
         grade = grade_case(case, result, judge)
     except Exception as exc:
         grade = {'score': None, 'status': 'unscored', 'reason': str(exc), 'judge_usage': {}}
@@ -38,6 +38,7 @@ def main():
     parser.add_argument('--model', default=os.getenv('MODEL'))
     parser.add_argument('--judge-provider', choices=choices, default=os.getenv('JUDGE_PROVIDER'))
     parser.add_argument('--judge-model', default=os.getenv('JUDGE_MODEL'))
+    parser.add_argument('--judge-temperature', type=float, default=None, help='Ví dụ 0 để judge ổn định hơn (mặc định: theo provider)')
     parser.add_argument('--bonus', action='store_true', help='Chạy bộ bonus riêng; không ảnh hưởng điểm chính')
     parser.add_argument('--case', help='Ví dụ E2 hoặc H1; bỏ trống để chạy toàn bộ')
     parser.add_argument('--max-steps', type=int, default=None, help='Giới hạn model calls mỗi case: mặc định 8, bonus 16')
@@ -64,7 +65,7 @@ def main():
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
         results = list(pool.map(run_and_print, selected))
     report = {'summary': summarize(results), 'config': {'provider': args.provider, 'model': args.model,
-              'judge_provider': args.judge_provider, 'judge_model': args.judge_model, 'max_steps': args.max_steps,
+              'judge_provider': args.judge_provider, 'judge_model': args.judge_model, 'judge_temperature': args.judge_temperature, 'max_steps': args.max_steps,
               'dataset': 'bonus' if args.bonus else 'core'}, 'cases': results}
     summary = report['summary']
     if args.bonus:

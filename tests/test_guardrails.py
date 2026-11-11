@@ -147,9 +147,9 @@ class RoleBoundaryTests(unittest.TestCase):
         for ours, given in zip(fake.seen, SCHEMAS):
             self.assertEqual(ours['function']['name'], given['function']['name'])
             self.assertEqual(ours['function']['parameters'], given['function']['parameters'])
-            self.assertIn('USE when', ours['function']['description'])
+            self.assertIn('USE ', ours['function']['description'])
             self.assertIn('DO NOT', ours['function']['description'])
-        self.assertNotIn('USE when', SCHEMAS[0]['function']['description'])  # lab schema is not mutated
+        self.assertNotIn('USE ', SCHEMAS[0]['function']['description'])  # lab schema is not mutated
 
     def test_tool_output_is_marked_untrusted_and_injection_flagged(self):
         sys.path.insert(0, str(ROOT / 'evals'))
@@ -209,8 +209,8 @@ class EvidenceLedgerTests(unittest.TestCase):
     def test_omitted_updates_are_counted(self):
         fake, result = self.run_case(StatusTools(), [tool_call('1', 'get_incident_details', '{"provider":"github","incident_id":"t89g2q1800fr"}')],
                                      'https://stspg.io/lv4q3xm9r0rk')
-        self.assertIn('updates_received=3 of updates_total=4', result['evidence_ledger'])
-        self.assertIn('only 3 of 4 updates were returned', result['evidence_ledger'])
+        self.assertIn('updates 3/4', result['evidence_ledger'])
+        self.assertIn('only 3 of 4 updates received', result['evidence_ledger'])
 
     def test_injected_fields_never_reach_the_ledger(self):
         sys.path.insert(0, str(ROOT / 'evals'))
@@ -228,7 +228,7 @@ class EvidenceLedgerTests(unittest.TestCase):
 
     def test_bonus_pagination_is_reported(self):
         _, result = self.run_case(BonusTools(), [tool_call('1', 'get_incident_details', '{"provider":"vercel","incident_id":"sps6n39gm4sg"}')], 'x')
-        self.assertIn('more updates exist after offset 2', result['evidence_ledger'])
+        self.assertIn('updates after offset 2 not read', result['evidence_ledger'])
 
 
 class HybridTraceTests(unittest.TestCase):

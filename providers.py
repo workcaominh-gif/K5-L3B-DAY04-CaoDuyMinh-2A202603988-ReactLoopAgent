@@ -30,12 +30,12 @@ class Provider:
     messages: system/user/assistant/tool theo format Chat Completions. message trả về
     cần được append nguyên vẹn; tool result có role, tool_call_id, content (JSON string).
     """
-    def __init__(self, name, model):
+    def __init__(self, name, model, temperature=None):
         if name not in CONFIG:
             raise ValueError(f'Provider không hợp lệ: {name}')
         if not model:
             raise ValueError('Cần đặt MODEL là model có hỗ trợ tool calling.')
-        self.name, self.model = name, model
+        self.name, self.model, self.temperature = name, model, temperature
         key_name, self.url = CONFIG[name]
         self.key = os.getenv(key_name)
         if not self.key:
@@ -45,6 +45,8 @@ class Provider:
         if self.name == 'anthropic':
             return self._anthropic(messages, schemas)
         payload = {'model': self.model, 'messages': messages}
+        if self.temperature is not None:
+            payload['temperature'] = self.temperature
         if schemas:
             payload['tools'] = schemas
         data = post_json(self.url, {'Authorization': f'Bearer {self.key}'}, payload)
@@ -76,6 +78,8 @@ class Provider:
                 native.append({'role': 'user', 'content': m['content']})
         tools = [{'name': x['function']['name'], 'description': x['function']['description'], 'input_schema': x['function']['parameters']} for x in schemas]
         payload = {'model': self.model, 'max_tokens': 8192, 'system': system, 'messages': native}
+        if self.temperature is not None:
+            payload['temperature'] = self.temperature
         if tools:
             payload['tools'] = tools
         data = post_json(self.url, {'x-api-key': self.key, 'anthropic-version': '2023-06-01'}, payload)
