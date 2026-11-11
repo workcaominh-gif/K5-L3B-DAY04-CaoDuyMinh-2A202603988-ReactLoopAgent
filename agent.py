@@ -131,7 +131,14 @@ def _evidence_ledger(trace):
             line += f"; keyword search {json.dumps(query or '', ensure_ascii=False)}: {total} matching, {len(r.get('incidents') or [])} returned"
             status.setdefault(provider, []).append(line)
             for i in r.get('incidents') or []:
-                listed.setdefault(i.get('id'), f"{i.get('id')} ({provider}) \"{i.get('name')}\" status={i.get('status')} last_updated={_when(i.get('updated_at'))}")
+                # R1: relevance is only "verified" when the searched keyword is in the incident name; the tool also
+                # matches update text, so other hits are "returned by the search, relevance not verified".
+                if query:
+                    hit = query.casefold() in (i.get('name') or '').casefold()
+                    rel = f'; keyword "{query}" in name: ' + ('yes' if hit else 'no (relevance not verified)')
+                else:
+                    rel = ''
+                listed.setdefault(i.get('id'), f"{i.get('id')} ({provider}) \"{i.get('name')}\" status={i.get('status')} last_updated={_when(i.get('updated_at'))}{rel}")
             if r.get('note'):
                 limits.append(f"{provider} search: {r['note']}")
             sources.append(r.get('source') or '')
@@ -139,7 +146,7 @@ def _evidence_ledger(trace):
             updates = r.get('updates') or []
             total = r.get('updates_total', r.get('total_updates'))
             truncated = sum(1 for u in updates if u.get('truncated'))
-            line = (f"{r.get('id')} ({provider}) \"{r.get('name')}\" status={r.get('status')} created={_when(r.get('created_at'))} "
+            line = (f"{r.get('id')} ({provider}) \"{r.get('name')}\" current status={r.get('status')} started(created_at)={_when(r.get('created_at'))} "
                     f"last_updated={_when(r.get('updated_at'))} components={r.get('components') or []} "
                     f"updates_received={len(updates)} of updates_total={total}")
             if r.get('next_offset') is not None:
@@ -168,7 +175,7 @@ def _evidence_ledger(trace):
         out += [f'- {x}' for x in read.values()]
     only_listed = [v for k, v in listed.items() if k not in read]
     if only_listed:
-        out.append('Incidents only LISTED in search results (details NOT read; last_updated is the last update time, not the start time):')
+        out.append('Incidents only LISTED in search results (details NOT read; last_updated is the time of the last update, not when the incident started):')
         out += [f'- {x}' for x in only_listed]
     if failed:
         out.append('Could NOT be checked (tool errors; state as unknown, never as up or down):')
