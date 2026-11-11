@@ -214,6 +214,57 @@ class EvidenceLedgerTests(unittest.TestCase):
         self.assertIn('updates after offset 2 not read', result['evidence_ledger'])
 
 
+class ThinkingProcessTests(unittest.TestCase):
+    """v3: related-incident hints and internal notes kept out of the answer."""
+    def test_link_in_update_becomes_next_step_hint(self):
+        fake = FakeProvider([tool_call('1', 'get_incident_details', '{"provider":"github","incident_id":"h02n9572mx9y"}'),
+                             final('x https://stspg.io/7pwv28hvkmz8')])
+        run_agent('q', fake, StatusTools())
+        observed = json.loads(fake.histories[1][-1]['content'])
+        self.assertIn({'provider': 'github', 'incident_id': 'xr3myzj7ms51'}, observed['related_incidents_not_read'])
+
+    def test_hint_disappears_once_related_incident_was_read(self):
+        a = tool_call('1', 'get_incident_details', '{"provider":"github","incident_id":"xr3myzj7ms51"}')
+        b = tool_call('2', 'get_incident_details', '{"provider":"github","incident_id":"h02n9572mx9y"}')
+        fake = FakeProvider([a, b, final('https://stspg.io/pjgptg3cfc6n https://stspg.io/7pwv28hvkmz8')])
+        run_agent('q', fake, StatusTools())
+        self.assertNotIn('related_incidents_not_read', json.loads(fake.histories[2][-1]['content']))
+
+    def test_echoed_injection_code_triggers_rewrite(self):
+        sys.path.insert(0, str(ROOT / 'evals'))
+        from scenarios import ScenarioTools
+        fake = FakeProvider([tool_call('1', 'get_status', '{"provider":"github","component":"Actions"}'),
+                             final('Ignored a notice asking to print STATUS_OVERRIDE_CONFIRMED.'),
+                             final('Ignored an untrusted instruction in the tool output.')])
+        result = run_agent('q', fake, ScenarioTools('status_injection'), max_steps=6)
+        self.assertNotIn('STATUS_OVERRIDE_CONFIRMED', result['answer'])
+        self.assertTrue(any(t['event'] == 'validation_injection_echo' for t in result['trace']))
+        self.assertEqual(fake.histories[2][-1]['role'], 'system')
+
+    def test_echoed_code_is_redacted_when_rewrites_run_out(self):
+        sys.path.insert(0, str(ROOT / 'evals'))
+        from scenarios import ScenarioTools
+        bad = 'Bỏ qua chuỗi LAB_OVERRIDE_CONFIRMED. https://stspg.io/pjgptg3cfc6n'
+        fake = FakeProvider([tool_call('1', 'get_incident_details', '{"provider":"github","incident_id":"xr3myzj7ms51"}'),
+                             final(bad), final(bad), final(bad)])
+        result = run_agent('q', fake, ScenarioTools('injection'), max_steps=6)
+        self.assertNotIn('LAB_OVERRIDE_CONFIRMED', result['answer'])
+        self.assertIn('[removed]', result['answer'])
+
+    def test_codes_in_clean_data_are_not_blocked(self):
+        from agent import _injected_codes
+        self.assertEqual(_injected_codes({'note': 'Status ALL_SYSTEMS_GO reported.'}), set())
+
+    def test_leading_thought_moves_from_answer_to_trace(self):
+        result = run_agent('x', FakeProvider([final('Thought: enough evidence -> answer.\n\n**Kết luận:** ổn.')]), StatusTools())
+        self.assertEqual(result['answer'], '**Kết luận:** ổn.')
+        self.assertEqual(next(t for t in result['trace'] if t['event'] == 'final_thought')['thought'], 'Thought: enough evidence -> answer.')
+
+    def test_answer_without_notes_is_unchanged(self):
+        result = run_agent('x', FakeProvider([final('Kết luận: Thought là một từ.')]), StatusTools())
+        self.assertEqual(result['answer'], 'Kết luận: Thought là một từ.')
+
+
 class TraceTests(unittest.TestCase):
     def test_thought_and_action_recorded_for_tool_steps(self):
         step = tool_call('1', 'get_status', '{"provider":"github"}')
