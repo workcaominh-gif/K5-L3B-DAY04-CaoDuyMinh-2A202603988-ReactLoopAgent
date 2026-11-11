@@ -147,9 +147,9 @@ class RoleBoundaryTests(unittest.TestCase):
         for ours, given in zip(fake.seen, SCHEMAS):
             self.assertEqual(ours['function']['name'], given['function']['name'])
             self.assertEqual(ours['function']['parameters'], given['function']['parameters'])
-            self.assertIn('DÙNG', ours['function']['description'])
-            self.assertIn('KHÔNG', ours['function']['description'])
-        self.assertNotIn('DÙNG', SCHEMAS[0]['function']['description'])  # không sửa schema gốc
+            self.assertIn('USE when', ours['function']['description'])
+            self.assertIn('DO NOT', ours['function']['description'])
+        self.assertNotIn('USE when', SCHEMAS[0]['function']['description'])  # lab schema is not mutated
 
     def test_tool_output_is_marked_untrusted_and_injection_flagged(self):
         sys.path.insert(0, str(ROOT / 'evals'))
@@ -176,8 +176,21 @@ class RoleBoundaryTests(unittest.TestCase):
     def test_bonus_prompt_keeps_provider_context(self):
         fake = FakeProvider([final()])
         run_agent('x', fake, BonusTools())
-        self.assertIn('DigitalOcean', fake.histories[0][0]['content'])
-        self.assertIn('<constraints>', fake.histories[0][0]['content'])
+        system = fake.histories[0][0]['content']
+        self.assertIn('You investigate the status of GitHub, Cloudflare, Vercel, npm and DigitalOcean.', system)
+        self.assertIn('<constraints>', system)
+        self.assertIn('<tool_set_notes>', system)  # tools.system_prompt is still used, as the GUIDE requires
+
+    def test_core_prompt_names_core_providers(self):
+        fake = FakeProvider([final()])
+        run_agent('x', fake, StatusTools())
+        self.assertIn('You investigate the status of GitHub and Cloudflare.', fake.histories[0][0]['content'])
+
+    def test_prompts_are_english(self):
+        fake = FakeProvider([final()])
+        run_agent('x', fake, StatusTools())
+        import re as _re
+        self.assertIsNone(_re.search('[ạảấầẩẫậắằẳẵặẹẻẽếềểễệịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹđ]', fake.histories[0][0]['content']))
 
 
 class HybridTraceTests(unittest.TestCase):
