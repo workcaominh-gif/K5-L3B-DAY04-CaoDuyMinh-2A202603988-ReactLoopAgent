@@ -1,0 +1,3 @@
+version,commit,files_changed,hypothesis,agent_model,judge_model,max_steps,score_0_100,missing_incident_url,model_calls,tool_calls,agent_input_tokens,agent_output_tokens,run_file
+v0,da5e031,agent.py,Baseline: ReAct loop with function calling and loop guardrails; the lab prompt,claude-sonnet-5-5,claude-sonnet-5-5,8,94.91,6/22,62,61,99849,33161,versions/v0/eval.json
+v1,b4f3b0b,prompts/*; agent.py,"Prompt in the slide order Persona -> Rules -> Capabilities -> Constraints -> Output contract, tool guides, role boundary and a source gate fix missing sources",claude-sonnet-5-5,claude-sonnet-5-5,8,93.91,0/22,59,55,152528,24965,versions/v1/eval.json

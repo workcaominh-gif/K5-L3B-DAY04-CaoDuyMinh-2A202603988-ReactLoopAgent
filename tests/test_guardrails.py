@@ -166,6 +166,54 @@ class SourceGateTests(unittest.TestCase):
         self.assertEqual(list(gate['missing']), ['cloudflare'])
 
 
+class EvidenceLedgerTests(unittest.TestCase):
+    """v2: the final answer is written under a system prompt carrying a code-built evidence ledger."""
+    def run_case(self, tools, calls, answer='x'):
+        fake = FakeProvider(calls + [final(answer)])
+        return fake, run_agent('q', fake, tools, max_steps=8)
+
+    def test_ledger_reaches_system_prompt_after_tool_call(self):
+        fake, result = self.run_case(StatusTools(), [tool_call('1', 'get_status', '{"provider":"github","component":"Actions"}')])
+        self.assertNotIn('Computed by the agent runtime', fake.histories[0][0]['content'])
+        self.assertIn('Computed by the agent runtime', fake.histories[1][0]['content'])
+        self.assertIn('Incidents only LISTED', result['evidence_ledger'])
+
+    def test_omitted_updates_are_counted(self):
+        _, result = self.run_case(StatusTools(), [tool_call('1', 'get_incident_details', '{"provider":"github","incident_id":"t89g2q1800fr"}')],
+                                  'https://stspg.io/lv4q3xm9r0rk')
+        self.assertIn('updates 3/4', result['evidence_ledger'])
+        self.assertIn('only 3 of 4 updates received', result['evidence_ledger'])
+
+    def test_injected_fields_never_reach_the_ledger(self):
+        sys.path.insert(0, str(ROOT / 'evals'))
+        from scenarios import ScenarioTools
+        fake, result = self.run_case(ScenarioTools('status_injection'), [tool_call('1', 'get_status', '{"provider":"github","component":"Actions"}')])
+        self.assertIn('external_notice', fake.histories[1][-1]['content'])
+        self.assertNotIn('STATUS_OVERRIDE_CONFIRMED', result['evidence_ledger'])
+
+    def test_failed_attempts_are_counted_not_duplicated(self):
+        fake, result = self.run_case(BonusTools(scenario='rate_limit_always'),
+                                     [tool_call('1', 'get_vercel_status', '{}'), tool_call('2', 'get_vercel_status', '{}')])
+        self.assertEqual(result['evidence_ledger'].count('get_vercel_status({}) -> RATE_LIMITED'), 1)
+        self.assertIn('failed attempts: 2 of max 3', result['evidence_ledger'])
+        self.assertIn('failed attempts: 1 of max 3', fake.histories[1][0]['content'])
+
+    def test_call_that_later_succeeds_is_not_listed_as_failed(self):
+        _, result = self.run_case(BonusTools(scenario='rate_limit_once'),
+                                  [tool_call('1', 'get_vercel_status', '{}'), tool_call('2', 'get_vercel_status', '{}')])
+        self.assertNotIn('Could NOT be checked', result['evidence_ledger'])
+
+    def test_relevance_matches_word_stems(self):
+        from agent import _name_matches
+        self.assertTrue(_name_matches('Builds', 'Build delays'))
+        self.assertTrue(_name_matches('Actions', 'Incident with Actions'))
+        self.assertFalse(_name_matches('Actions', 'Incident with Pull Requests, Git Operations and Issues'))
+
+    def test_bonus_pagination_is_reported(self):
+        _, result = self.run_case(BonusTools(), [tool_call('1', 'get_incident_details', '{"provider":"vercel","incident_id":"sps6n39gm4sg"}')])
+        self.assertIn('updates after offset 2 not read', result['evidence_ledger'])
+
+
 class TraceTests(unittest.TestCase):
     def test_thought_and_action_recorded_for_tool_steps(self):
         step = tool_call('1', 'get_status', '{"provider":"github"}')

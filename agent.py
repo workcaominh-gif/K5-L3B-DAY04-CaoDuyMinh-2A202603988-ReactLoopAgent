@@ -23,6 +23,8 @@ Prompt (v1, theo slide Day 3): prompts/system_prompt.md gồm Persona -> Rules -
 -> Output contract, xếp theo thứ tự ưu tiên. prompts/tool_guides.json viết lại mô tả tool (USE / DO NOT use).
 Ranh giới vai trò: chỉ system là chỉ dẫn; dữ liệu tool có câu giống lệnh được gắn cờ.
 Evidence gate (Bài 4): đã đọc incident thì câu trả lời phải chứa URL incident của provider đó.
+Evidence ledger (v2): trước mỗi lượt gọi model, code dựng lại <evidence_ledger> trong system prompt từ các tool
+result (allow-list trường): đọc / chỉ liệt kê, số update nhận được, lỗi kèm số lần thử, giới hạn, nguồn.
 """
 import concurrent.futures
 import copy
@@ -149,6 +151,114 @@ def _system_prompt(tools, schemas):
                                     tool_set_notes=tool_set_notes)
 
 
+def _stem(word):
+    word = word.casefold()
+    return word[:-1] if len(word) > 4 and word.endswith('s') else word
+
+
+def _name_matches(query, name):
+    """True if any keyword of the query (4+ letters) appears, by word stem, in the incident name.
+    ("Builds" matches "Build delays"; "Actions" matches "Incident with Actions".)"""
+    words = [_stem(w) for w in re.findall(r'[\w-]+', name)]
+    keys = [_stem(k) for k in re.findall(r'[\w-]+', query) if len(k) >= 4]
+    return any(w.startswith(k) for k in keys for w in words)
+
+
+def _when(ts):
+    return ts or 'unknown'
+
+
+def _evidence_ledger(trace):
+    """Facts computed by code from executed tool calls. Rebuilt before every model call and placed in the
+    system prompt, so the final answer is written under a guided system prompt that already states what was
+    read, what was only listed, what failed and which limits may be claimed. Only allow-listed fields are
+    copied, so unexpected fields in tool results (for example injected notices) never reach this block."""
+    status, read, listed, failed, not_found, limits, sources = {}, {}, {}, {}, [], [], []
+    for t in trace:
+        if t.get('event') not in ('tool', 'tool_blocked'):
+            continue
+        name, args, r = t.get('name') or '', t.get('arguments') or {}, t.get('result') or {}
+        provider = r.get('provider') or (args.get('provider') if isinstance(args, dict) else None) \
+            or (name[4:-7] if name.startswith('get_') and name.endswith('_status') and len(name) > 11 else '?')
+        if r.get('ok') is False or 'error' in r:
+            if r.get('error') == 'INCIDENT_NOT_FOUND':
+                not_found.append(f"{args.get('incident_id')} ({provider}): INCIDENT_NOT_FOUND in the incidents searched")
+            else:
+                # One line per distinct call with its attempt count, so a single failure is never read as a retry.
+                key = f"{name}({json.dumps(args, ensure_ascii=False)})"
+                n = failed.get(key, (0, ''))[0] + 1
+                failed[key] = (n, r.get('error'))
+            continue
+        failed.pop(f"{name}({json.dumps(args, ensure_ascii=False)})", None)
+        if 'overall' in r:
+            overall = r.get('overall') or {}
+            line = (f"{provider}: captured_at={_when(r.get('captured_at'))}; overall indicator={overall.get('indicator')} "
+                    f"\"{overall.get('description')}\"")
+            comps = ', '.join(f"{c.get('name')}={c.get('status')}" for c in r.get('components') or [])
+            if comps:
+                line += f'; components: {comps}'
+            query = args.get('component') if isinstance(args, dict) else None
+            total = r.get('matching_incidents_in_last_50', r.get('match_count'))
+            line += f"; keyword search {json.dumps(query or '', ensure_ascii=False)}: {total} matching, {len(r.get('incidents') or [])} returned"
+            status.setdefault(provider, []).append(line)
+            for i in r.get('incidents') or []:
+                # R1: relevance is only "verified" when the searched keyword is in the incident name; the tool also
+                # matches update text, so other hits are "returned by the search, relevance not verified".
+                if query:
+                    hit = _name_matches(query, i.get('name') or '')
+                    rel = '; name matches' if hit else '; name does not match (relevance unverified)'
+                else:
+                    rel = ''
+                listed.setdefault(i.get('id'), f"{i.get('id')} ({provider}) \"{i.get('name')}\" status={i.get('status')} last_updated={_when(i.get('updated_at'))}{rel}")
+            if r.get('note'):
+                limits.append(f"{provider} search: {r['note']}")
+            sources.append(r.get('source') or '')
+        elif r.get('url') and r.get('id'):
+            updates = r.get('updates') or []
+            total = r.get('updates_total', r.get('total_updates'))
+            truncated = sum(1 for u in updates if u.get('truncated'))
+            line = (f"{r.get('id')} ({provider}) \"{r.get('name')}\" status={r.get('status')} created_at={_when(r.get('created_at'))} "
+                    f"last_updated={_when(r.get('updated_at'))} components={r.get('components') or []} "
+                    f"updates {len(updates)}/{total}")
+            if r.get('next_offset') is not None:
+                line += f" next_offset={r['next_offset']}"
+            line += f' url={r["url"]}'
+            read[r.get('id')] = line
+            if isinstance(total, int) and total > len(updates) and r.get('next_offset') is None and 'offset' not in r:
+                limits.append(f"{r.get('id')}: only {len(updates)} of {total} updates received")
+            if r.get('next_offset') is not None:
+                limits.append(f"{r.get('id')}: updates after offset {r['next_offset']} not read")
+            if truncated:
+                limits.append(f"{r.get('id')}: {truncated} update(s) truncated")
+            if r.get('untrusted_instruction_detected'):
+                limits.append(f"{r.get('id')}: instruction-like text ignored")
+            sources.append(r['url'])
+    if not (status or read or failed or not_found):
+        return ''
+    out = ['<evidence_ledger>', 'Computed by the agent runtime from tool results (data). Base the answer on it.']
+    if status:
+        out.append('Status:')
+        out += [f'- {x}' for lines in status.values() for x in dict.fromkeys(lines)]
+    if read:
+        out.append('Incidents READ:')
+        out += [f'- {x}' for x in read.values()]
+    only_listed = [v for k, v in listed.items() if k not in read]
+    if only_listed:
+        out.append('Incidents only LISTED (not read):')
+        out += [f'- {x}' for x in only_listed]
+    if failed:
+        out.append('Could NOT be checked:')
+        out += [f'- {k} -> {err} (failed attempts: {n} of max {MAX_ATTEMPTS})' for k, (n, err) in failed.items()]
+    if not_found:
+        out.append('Not found:')
+        out += [f'- {x}' for x in not_found]
+    out.append('Limits:')
+    out += [f'- {x}' for x in dict.fromkeys(limits)] or ['- none recorded']
+    out.append('Sources: ' + (', '.join(dict.fromkeys(x for x in sources if x)) or 'none'))
+    out.append('</evidence_ledger>')
+    return '\n'.join(out)
+
+
 def _mark_untrusted(result):
     """Flag instruction-like text in tool data (the note is added only when flagged, to save tokens)."""
     if not SUSPICIOUS.search(json.dumps(result, ensure_ascii=False, default=str)):
@@ -171,7 +281,9 @@ def _total_tokens(usage):
 def run_agent(question, provider, tools, max_steps=6):
     """Trả dict: status, answer, trace, usage. Contract chi tiết trong GUIDE.md."""
     schemas = _tool_schemas(getattr(tools, 'schemas', SCHEMAS))       # bonus: tools tự khai báo schemas
-    messages = [{'role': 'system', 'content': _system_prompt(tools, schemas)}, {'role': 'user', 'content': question}]
+    base_system = _system_prompt(tools, schemas)
+    messages = [{'role': 'system', 'content': base_system}, {'role': 'user', 'content': question}]
+    ledger = ''
     trace, usage = [], []
     sources = {}       # provider -> URL của các incident đã đọc thành công
     revisions = 0
@@ -181,7 +293,7 @@ def run_agent(question, provider, tools, max_steps=6):
 
     def done(status, answer='', error=None):
         out = {'status': status, 'answer': answer or '', 'trace': trace, 'usage': usage,
-               'model_calls': len(usage), 'total_tokens': _total_tokens(usage)}
+               'model_calls': len(usage), 'total_tokens': _total_tokens(usage), 'evidence_ledger': ledger}
         if error:
             out['error'] = error
         return out
@@ -198,6 +310,11 @@ def run_agent(question, provider, tools, max_steps=6):
                  'say what could not be checked.', 'wrap_up', step)
             wrap_up_sent = True
 
+        # Guided final answer: the system prompt carries a code-built evidence ledger of everything observed.
+        new_ledger = _evidence_ledger(trace)
+        if new_ledger != ledger:
+            ledger = new_ledger
+            messages[0] = {'role': 'system', 'content': base_system + '\n\n' + ledger}
         try:
             response = provider.complete(messages, schemas)
         except Exception as exc:
