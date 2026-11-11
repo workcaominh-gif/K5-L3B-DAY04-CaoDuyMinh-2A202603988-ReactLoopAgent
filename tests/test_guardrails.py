@@ -226,6 +226,19 @@ class EvidenceLedgerTests(unittest.TestCase):
         self.assertIn('Could NOT be checked', result['evidence_ledger'])
         self.assertIn('TimeoutError', result['evidence_ledger'])
 
+    def test_failed_attempts_are_counted_not_duplicated(self):
+        fake, result = self.run_case(BonusTools(scenario='rate_limit_always'),
+                                     [tool_call('1', 'get_vercel_status', '{}'), tool_call('2', 'get_vercel_status', '{}')])
+        ledger = result['evidence_ledger']
+        self.assertEqual(ledger.count('get_vercel_status({}) -> RATE_LIMITED'), 1)
+        self.assertIn('failed attempts: 2 of max 3', ledger)
+        self.assertIn('failed attempts: 1 of max 3', fake.histories[1][0]['content'])
+
+    def test_call_that_later_succeeds_is_not_listed_as_failed(self):
+        _, result = self.run_case(BonusTools(scenario='rate_limit_once'),
+                                  [tool_call('1', 'get_vercel_status', '{}'), tool_call('2', 'get_vercel_status', '{}')])
+        self.assertNotIn('Could NOT be checked', result['evidence_ledger'])
+
     def test_bonus_pagination_is_reported(self):
         _, result = self.run_case(BonusTools(), [tool_call('1', 'get_incident_details', '{"provider":"vercel","incident_id":"sps6n39gm4sg"}')], 'x')
         self.assertIn('updates after offset 2 not read', result['evidence_ledger'])

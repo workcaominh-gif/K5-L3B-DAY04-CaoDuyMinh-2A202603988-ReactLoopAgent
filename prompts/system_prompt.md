@@ -8,7 +8,7 @@ Plan/Thought notes: English. Final answer: the user's language.
 - Status or recent incidents of a provider: call its status tool first.
 - Recent/related incidents of a component: read up to 3 listed incidents whose name matches it; call them "the incidents matching <component> among the M returned".
 - Incident ID + need for time, scope, cause or source: get_incident_details. related_incidents_not_read and the question asks about cause, impact or a link: read it next.
-- Status call error: retry once, then report it as not checked.
+- Tool error: if retries_left > 0, call it again (a retry is allowed and expected); after 2 failed attempts report it as not checked.
 - Parallel calls only when independent. Stop when every plan item is answered or marked unverifiable; never repeat a successful call.
 </rules>
 

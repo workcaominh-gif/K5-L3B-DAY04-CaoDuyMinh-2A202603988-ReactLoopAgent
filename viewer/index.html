@@ -79,7 +79,7 @@
     <code>http://localhost:8765/viewer/</code>.
   </div>
   <div class="panel" id="versions">
-    <div><b>Lịch sử phiên bản</b> <span class="muted">· mỗi phiên bản một giả thuyết · cùng agent model, judge, max_steps và dataset · bấm một phiên bản để so với baseline v0</span></div>
+    <div><b>Lịch sử phiên bản</b> <span class="muted">· mỗi phiên bản một giả thuyết · biểu đồ và so sánh chỉ trong cùng một model (baseline = v0 của model đó) · bấm một phiên bản để so</span></div>
     <div class="vwrap">
       <svg id="chart" viewBox="0 0 640 170" role="img" aria-label="Điểm tổng theo phiên bản"></svg>
       <div class="vinfo" id="vinfo"></div>
@@ -99,6 +99,7 @@
 <script>
 const runs = {};
 let versions = [], dataset = 'core', selected = 'A2', after = null;
+const baseOf = v => versions.find(x => x.agent_model === v?.agent_model && runs[x.run_file]) || versions[0];
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const short = (v, n=160) => { const s = typeof v === 'string' ? v : JSON.stringify(v); return s.length > n ? s.slice(0, n) + '…' : s; };
@@ -133,7 +134,7 @@ async function load() {
   const [ds, id, ver] = location.hash.slice(1).split('/');
   if (ds === 'bonus') dataset = 'bonus';
   if (id) selected = id; else if (dataset === 'bonus') selected = 'B4';
-  const usable = versions.filter(v => runs[v.run_file] && v !== versions[0]);
+  const usable = versions.filter(v => runs[v.run_file] && v !== baseOf(v));
   after = versions.find(v => v.version === ver && runs[v.run_file]) || usable[usable.length - 1] || versions[0];
   if (!runs[versions[0].run_file]) document.getElementById('loadmsg').hidden = false;
   render();
@@ -167,7 +168,7 @@ function stats(r) {
 }
 
 function renderVersions() {
-  const pts = versions.map(v => ({v, score: runs[v.run_file]?.summary?.score_0_100 ?? (parseFloat(v.score_0_100) || null)})).filter(p => p.score != null);
+  const pts = versions.filter(v => v.agent_model === after?.agent_model).map(v => ({v, score: runs[v.run_file]?.summary?.score_0_100 ?? (parseFloat(v.score_0_100) || null)})).filter(p => p.score != null);
   const svg = document.getElementById('chart');
   if (pts.length < 2) { svg.innerHTML = ''; }
   else {
@@ -177,18 +178,20 @@ function renderVersions() {
     let g = '';
     for (let s = lo; s <= hi; s++) g += `<line x1="${L}" x2="${W - R}" y1="${y(s)}" y2="${y(s)}" stroke="var(--line)"/><text x="${L - 8}" y="${y(s) + 4}" text-anchor="end">${s}</text>`;
     g += `<line class="base" x1="${L}" x2="${W - R}" y1="${y(pts[0].score)}" y2="${y(pts[0].score)}"/>`;
+    g += `<text x="${W - R}" y="14" text-anchor="end">${esc(after?.agent_model || '')}</text>`;
     g += `<polyline class="ln" points="${pts.map((p, i) => `${x(i)},${y(p.score)}`).join(' ')}"/>`;
     pts.forEach((p, i) => {
       g += `<circle class="pt ${p.v === after ? 'sel' : ''}" data-v="${esc(p.v.version)}" cx="${x(i)}" cy="${y(p.score)}" r="6"><title>${esc(p.v.version)}: ${p.score}</title></circle>`
         + `<text class="val" x="${x(i) + (i === 0 ? 10 : 0)}" y="${y(p.score) - 11}" text-anchor="${i === 0 ? 'start' : i === pts.length - 1 ? 'end' : 'middle'}">${p.score}</text>`
         + `<text x="${x(i)}" y="${H - 12}" text-anchor="middle">${esc(p.v.version)}</text>`;
     });
-    svg.innerHTML = g + `<text x="${L}" y="14">Điểm tổng 0–100 (trục cắt ở ${lo}–${hi}; nét đứt = baseline v0)</text>`;
+    svg.innerHTML = g + `<text x="${L}" y="14">Điểm tổng 0–100 (trục cắt ${lo}–${hi}; nét đứt = baseline)</text>`;
     svg.querySelectorAll('.pt').forEach(c => c.onclick = () => pick(c.dataset.v));
   }
   document.getElementById('chips').innerHTML = versions.map(v => {
     const ok = !!runs[v.run_file], s = runs[v.run_file]?.summary?.score_0_100 ?? v.score_0_100;
-    return `<button data-v="${esc(v.version)}" aria-pressed="${v === after}" ${ok ? '' : 'disabled title="Chưa có file run"'}>${esc(v.version)} · ${esc(s || '—')}</button>`;
+    const m = (v.agent_model || '').replace('claude-', '').replace('-5-5', '');
+    return `<button data-v="${esc(v.version)}" aria-pressed="${v === after}" ${ok ? '' : 'disabled title="Chưa có file run"'}>${esc(v.version)} · ${esc(s || '—')} <span style="opacity:.65;font-size:12px">${esc(m)}</span></button>`;
   }).join('');
   document.querySelectorAll('#chips button').forEach(b => b.onclick = () => pick(b.dataset.v));
   const a = after || {};
@@ -205,7 +208,7 @@ function render() {
   location.hash = dataset + '/' + selected + '/' + (after?.version || '');
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.ds === dataset));
   renderVersions();
-  const base = versions[0];
+  const base = baseOf(after);
   const sets = dataset === 'core'
     ? (after === base ? [[base.version, runs[base.run_file]]] : [[base.version, runs[base.run_file]], [after.version, runs[after.run_file]]])
     : [['bonus', runs['eval_bonus.json'] !== undefined ? runs['eval_bonus.json'] : null]];
@@ -304,7 +307,7 @@ function highlightUrls(text) {
 function colTitle(label) {
   if (label === 'bonus') return 'Bonus · agent hiện tại';
   const v = versions.find(x => x.version === label) || {};
-  return `${esc(label)}${v === versions[0] ? ' · baseline' : ''} <span class="muted" style="font-weight:400;font-size:13px">commit ${esc(v.commit || '—')}</span>`;
+  return `${esc(label)}${v === baseOf(v) ? ' · baseline' : ''} <span class="muted" style="font-weight:400;font-size:13px">commit ${esc(v.commit || '—')}</span>`;
 }
 function renderDetail(pairs) {
   const c0 = pairs[0][1];

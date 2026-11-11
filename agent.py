@@ -106,7 +106,7 @@ def _evidence_ledger(trace):
     system prompt, so the final answer is written under a guided system prompt that already states what was
     read, what was only listed, what failed and which limits may be claimed. Only allow-listed fields are
     copied, so unexpected fields in tool results (for example injected notices) never reach this block."""
-    status, read, listed, failed, not_found, limits, sources = {}, {}, {}, [], [], [], []
+    status, read, listed, failed, not_found, limits, sources = {}, {}, {}, {}, [], [], []
     for t in trace:
         if t.get('event') not in ('tool', 'tool_blocked'):
             continue
@@ -117,8 +117,12 @@ def _evidence_ledger(trace):
             if r.get('error') == 'INCIDENT_NOT_FOUND':
                 not_found.append(f"{args.get('incident_id')} ({provider}): INCIDENT_NOT_FOUND in the incidents searched")
             else:
-                failed.append(f"{name}({json.dumps(args, ensure_ascii=False)}) -> {r.get('error')}")
+                # One line per distinct call with its attempt count, so a single failure is never read as a retry.
+                key = f"{name}({json.dumps(args, ensure_ascii=False)})"
+                n = failed.get(key, (0, ''))[0] + 1
+                failed[key] = (n, r.get('error'))
             continue
+        failed.pop(f"{name}({json.dumps(args, ensure_ascii=False)})", None)
         if 'overall' in r:
             overall = r.get('overall') or {}
             line = (f"{provider}: captured_at={_when(r.get('captured_at'))}; overall indicator={overall.get('indicator')} "
@@ -177,7 +181,7 @@ def _evidence_ledger(trace):
         out += [f'- {x}' for x in only_listed]
     if failed:
         out.append('Could NOT be checked:')
-        out += [f'- {x}' for x in failed]
+        out += [f'- {k} -> {err} (failed attempts: {n} of max {MAX_ATTEMPTS})' for k, (n, err) in failed.items()]
     if not_found:
         out.append('Not found:')
         out += [f'- {x}' for x in not_found]
@@ -397,8 +401,10 @@ def run_agent(question, provider, tools, max_steps=6):
                                 related = _related_incidents(result, prov, read_ids)
                                 if related:
                                     result['related_incidents_not_read'] = related
-                        elif result.get('error') not in ('DUPLICATE_CALL',):
+                        else:
                             progressed = True  # lỗi mới vẫn là thông tin mới cho model
+                            # Make the retry budget explicit on the observation itself.
+                            result = dict(result, attempt=attempts[signature], retries_left=MAX_ATTEMPTS - attempts[signature])
                 trace.append({'event': event, 'step': step, 'name': name,
                               'arguments': args if args is not None else raw, 'result': result})
                 messages.append({'role': 'tool', 'tool_call_id': call.get('id'),
