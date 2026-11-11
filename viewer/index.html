@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent Trace Viewer</title>
+<style>
+  :root{--bg:#f5f4f0;--panel:#fff;--ink:#16191f;--soft:#5b6270;--line:#e2dfd8;--accent:#1d4ed8;--accentb:#e0e9ff;
+    --good:#166534;--goodb:#dcfce7;--bad:#9f1239;--badb:#ffe4e6;--warn:#92400e;--warnb:#fef3c7;--code:#f1efe9;--think:#6d28d9;--thinkb:#f1eafe}
+  @media (prefers-color-scheme:dark){:root{--bg:#12151b;--panel:#1b1f27;--ink:#eceae4;--soft:#a3abb9;--line:#2b313d;--accent:#93b4ff;--accentb:#1f2d4f;
+    --good:#a7f0c0;--goodb:#163a26;--bad:#ffc2cc;--badb:#4a1d29;--warn:#fcd9a0;--warnb:#47331a;--code:#232832;--think:#d4c2ff;--thinkb:#30254d}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{padding:20px 16px 12px;max-width:1400px;margin:0 auto}
+  h1{margin:0;font-size:24px} .sub{color:var(--soft);font-size:14px}
+  main{max-width:1400px;margin:0 auto;padding:0 16px 40px}
+  .tabs{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+  .tabs button,.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:6px 14px;border-radius:999px;cursor:pointer;font:inherit}
+  .tabs button[aria-pressed=true]{background:var(--accent);color:var(--panel);border-color:var(--accent)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+  .card .k{color:var(--soft);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  .card .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+  .layout{display:grid;grid-template-columns:300px 1fr;gap:14px;align-items:start}
+  @media (max-width:860px){.layout{grid-template-columns:1fr}}
+  .list{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;max-height:78vh;overflow-y:auto}
+  .row{display:grid;grid-template-columns:44px 1fr 1fr 52px;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line);cursor:pointer;align-items:center;font-variant-numeric:tabular-nums}
+  .row:hover{background:var(--code)} .row.sel{background:var(--accentb)}
+  .row.head{cursor:default;font-size:12px;color:var(--soft);background:var(--panel);position:sticky;top:0}
+  .delta.up{color:var(--good);font-weight:700} .delta.down{color:var(--bad);font-weight:700}
+  .flag{font-size:11px;padding:0 6px;border-radius:999px;background:var(--badb);color:var(--bad);margin-left:4px}
+  .q{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:12px}
+  .q b{font-size:12px;color:var(--soft);text-transform:uppercase;letter-spacing:.04em;display:block}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .cols.one{grid-template-columns:1fr}
+  @media (max-width:1100px){.cols{grid-template-columns:1fr}}
+  .col{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}
+  .col h2{margin:0 0 6px;font-size:16px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .score{font-size:20px;font-variant-numeric:tabular-nums}
+  .dims{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 8px}
+  .pill{font-size:12px;padding:1px 8px;border-radius:999px;background:var(--code)}
+  .pill.bad{background:var(--badb);color:var(--bad)} .pill.good{background:var(--goodb);color:var(--good)} .pill.warn{background:var(--warnb);color:var(--warn)}
+  .reason{font-size:13px;color:var(--soft);margin-bottom:10px}
+  .step{border-left:3px solid var(--line);padding:2px 0 8px 12px;margin-left:4px}
+  .step .sn{font-size:12px;font-weight:700;color:var(--soft)}
+  .thought{background:var(--thinkb);color:var(--think);border-radius:8px;padding:4px 10px;margin:4px 0;font-size:13px}
+  .act{margin:6px 0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .act .h{padding:4px 10px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;background:var(--code);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .act .o{padding:4px 10px;font-size:12.5px}
+  .event{margin:6px 0;padding:4px 10px;border-radius:8px;font-size:12.5px;background:var(--warnb);color:var(--warn)}
+  details summary{cursor:pointer;color:var(--accent);font-size:12px}
+  pre{white-space:pre-wrap;word-break:break-word;background:var(--code);padding:8px;border-radius:8px;font-size:12px;max-height:320px;overflow:auto;margin:4px 0}
+  .answer{white-space:pre-wrap;word-break:break-word;background:var(--code);padding:10px;border-radius:8px;font-size:13px;max-height:420px;overflow:auto}
+  .answer mark{background:var(--goodb);color:var(--good);border-radius:4px;padding:0 2px}
+  .ok{color:var(--good)} .err{color:var(--bad)}
+  .muted{color:var(--soft)}
+  .loader{background:var(--panel);border:1px dashed var(--line);border-radius:12px;padding:16px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Agent Trace Viewer</h1>
+  <div class="sub">Status Investigation Agent · Day 04 · Cao Duy Minh 2A202603988 · so sánh trace trước và sau cải tiến (Thought → Action → Observation)</div>
+</header>
+<main>
+  <div class="tabs" role="tablist">
+    <button data-ds="core" aria-pressed="true">Core: before vs after (22 case)</button>
+    <button data-ds="bonus" aria-pressed="false">Bonus (10 case)</button>
+  </div>
+  <div id="loadmsg" class="loader" hidden>
+    Không đọc được file eval qua HTTP. Chạy <code>python3 -m http.server 8765</code> tại thư mục repo rồi mở
+    <code>http://localhost:8765/viewer/</code>, hoặc chọn file:
+    <input type="file" id="files" multiple accept=".json">
+  </div>
+  <div id="cards" class="cards"></div>
+  <div class="layout">
+    <div class="list" id="list"></div>
+    <section id="detail"></section>
+  </div>
+</main>
+<script>
+const FILES = {before: '../eval_before.json', after: '../eval_after.json', bonus: '../eval_bonus.json'};
+const data = {};
+let dataset = 'core', selected = null;
+
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const short = (v, n=160) => { const s = typeof v === 'string' ? v : JSON.stringify(v); return s.length > n ? s.slice(0, n) + '…' : s; };
+
+async function load() {
+  for (const [k, url] of Object.entries(FILES)) {
+    try { const r = await fetch(url); if (r.ok) data[k] = await r.json(); } catch (e) {}
+  }
+  if (!data.before && !data.after) document.getElementById('loadmsg').hidden = false;
+  const hash = location.hash.slice(1).split('/');
+  if (hash[0] === 'bonus') dataset = 'bonus';
+  selected = hash[1] || (dataset === 'bonus' ? 'B4' : 'A2');
+  render();
+}
+document.getElementById('files').addEventListener('change', async e => {
+  for (const f of e.target.files) {
+    const j = JSON.parse(await f.text());
+    const key = j.config?.dataset === 'bonus' ? 'bonus' : (/after/.test(f.name) ? 'after' : 'before');
+    data[key] = j;
+  }
+  document.getElementById('loadmsg').hidden = true; render();
+});
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  dataset = b.dataset.ds; selected = dataset === 'bonus' ? 'B4' : 'A2'; render();
+});
+
+// Same rule as the agent's evidence gate: each provider whose incident was read must have one of its URLs in the answer.
+function missingSources(c) {
+  const urls = {};
+  for (const t of c.result.trace || []) if (t.event === 'tool' && t.name === 'get_incident_details' && t.result?.ok && t.result.url)
+    (urls[t.result.provider] ??= new Set()).add(t.result.url);
+  return Object.entries(urls).filter(([p, u]) => ![...u].some(x => c.result.answer.includes(x))).map(([p]) => p);
+}
+function stats(r) {
+  const cs = r.cases, usage = cs.flatMap(c => c.result.usage || []);
+  const tok = k => usage.reduce((s, u) => s + (u[k] || 0), 0);
+  return {score: r.summary.score_0_100, calls: usage.length,
+    tools: cs.reduce((s, c) => s + (c.result.trace || []).filter(t => t.event === 'tool').length, 0),
+    missing: cs.filter(c => missingSources(c).length).length, total: cs.length,
+    inTok: tok('input_tokens') || tok('prompt_tokens'), outTok: tok('output_tokens') || tok('completion_tokens'),
+    bonus: r.summary.bonus_points_0_15};
+}
+
+function render() {
+  location.hash = dataset + '/' + selected;
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.ds === dataset));
+  const sets = dataset === 'core' ? [['before', data.before], ['after', data.after]] : [['bonus', data.bonus]];
+  const present = sets.filter(([, r]) => r);
+  const cards = document.getElementById('cards');
+  if (!present.length) { cards.innerHTML = ''; document.getElementById('list').innerHTML = ''; document.getElementById('detail').innerHTML = ''; return; }
+  const S = present.map(([k, r]) => [k, stats(r), r.config]);
+  const card = (k, v) => `<div class="card"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+  const both = (f) => S.map(([, s]) => f(s)).join(' → ');
+  cards.innerHTML = card('Điểm tổng', both(s => s.score ?? 'null'))
+    + (dataset === 'bonus' ? card('Điểm bonus', (S[0][1].bonus ?? 'null') + '/15') : '')
+    + card('Thiếu URL incident', both(s => `${s.missing}/${s.total}`))
+    + card('Model calls', both(s => s.calls)) + card('Tool calls', both(s => s.tools))
+    + card('Token in / out', both(s => `${(s.inTok/1000).toFixed(0)}k/${(s.outTok/1000).toFixed(0)}k`))
+    + card('Agent · judge', `<span style="font-size:13px">${esc(S[0][2].model)} · ${esc(S[0][2].judge_model)}<br>max_steps ${S[0][2].max_steps}</span>`);
+
+  const ids = present[0][1].cases.map(c => c.id);
+  const byId = Object.fromEntries(present.map(([k, r]) => [k, Object.fromEntries(r.cases.map(c => [c.id, c]))]));
+  let html = `<div class="row head"><span>Case</span><span>${present[0][0]}</span><span>${present[1]?.[0] ?? ''}</span><span>Δ</span></div>`;
+  for (const id of ids) {
+    const a = byId[present[0][0]][id], b = present[1] ? byId[present[1][0]][id] : null;
+    const sa = a.grade.score, sb = b?.grade.score;
+    const d = b && sa != null && sb != null ? sb - sa : null;
+    const flagA = missingSources(a).length ? '<span class="flag" title="Thiếu URL incident">no src</span>' : '';
+    const flagB = b && missingSources(b).length ? '<span class="flag">no src</span>' : '';
+    html += `<div class="row ${id === selected ? 'sel' : ''}" data-id="${id}"><b>${id}</b><span>${sa ?? '—'}${flagA}</span><span>${b ? (sb ?? '—') + flagB : ''}</span>`
+      + `<span class="delta ${d > 0 ? 'up' : d < 0 ? 'down' : ''}">${d == null ? '' : (d > 0 ? '+' : '') + d}</span></div>`;
+  }
+  const list = document.getElementById('list'); list.innerHTML = html;
+  list.querySelectorAll('.row[data-id]').forEach(r => r.onclick = () => { selected = r.dataset.id; render(); });
+  if (!ids.includes(selected)) selected = ids[0];
+  renderDetail(present.map(([k]) => [k, byId[k][selected]]));
+}
+
+function renderObs(r) {
+  if (!r || typeof r !== 'object') return esc(short(r));
+  if (r.ok === false || r.error) return `<span class="err">✗ ${esc(r.error)}</span> ${esc(short(r.message || '', 140))}`;
+  const bits = [];
+  if (r.overall) bits.push(`overall: ${esc(r.overall.indicator ?? short(r.overall, 60))}`);
+  if (r.name) bits.push(`“${esc(r.name)}” · ${esc(r.status)}`);
+  if (r.incidents) bits.push(`${r.incidents.length} incident (khớp ${r.matching_incidents_in_last_50 ?? r.match_count ?? '?'})`);
+  if (r.updates) bits.push(`${r.updates.length}/${r.updates_total ?? r.total_updates} update`);
+  if (r.next_offset != null) bits.push(`next_offset ${r.next_offset}`);
+  if (r.distractors) bits.push(`${r.distractors.length} mục nhiễu`);
+  if (r.related_incidents_not_read) bits.push(`<span class="pill warn">gợi ý đọc tiếp: ${r.related_incidents_not_read.map(x => esc(x.incident_id)).join(', ')}</span>`);
+  if (r.url) bits.push(`<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.url)}</a>`);
+  return `<span class="ok">✓</span> ` + bits.join(' · ');
+}
+
+const GUARD = {validation_missing_source: 'Evidence gate: thiếu URL nguồn → yêu cầu viết lại', validation_sources_appended: 'Evidence gate: code tự gắn nguồn',
+  tool_duplicate: 'Loop guard: call trùng, không chạy lại', tool_blocked: 'Retry guard: đã đủ số lần thử', retry_wait: 'Chờ retry-after rồi thử lại',
+  loop_detected: 'Loop guard: 2 step không tiến triển', wrap_up: 'Lượt cuối / budget: yêu cầu kết luận', provider_error: 'Lỗi provider', max_steps: 'Hết max_steps', error: 'Lỗi'};
+
+function renderTrace(c) {
+  const steps = {};
+  for (const t of c.result.trace || []) (steps[t.step ?? 0] ??= []).push(t);
+  // Agent ghi retry_wait trước event tool tương ứng; hiển thị nó ngay sau tool đó cho dễ đọc.
+  for (const evs of Object.values(steps)) for (let i = 0; i < evs.length - 1; i++)
+    if (evs[i].event === 'retry_wait' && evs[i + 1].event === 'tool') { [evs[i], evs[i + 1]] = [evs[i + 1], evs[i]]; i++; }
+  let h = '';
+  for (const [n, evs] of Object.entries(steps)) {
+    h += `<div class="step"><div class="sn">STEP ${n}</div>`;
+    for (const t of evs) {
+      if (t.event === 'model') {
+        const th = t.thought || '';
+        if (th) h += `<div class="thought">💭 ${esc(th)}</div>`;
+        else if ((t.tool_calls?.length || t.actions?.length)) h += `<div class="thought muted" style="opacity:.75">💭 (model không ghi Thought)</div>`;
+        if (t.finish === 'stop') h += `<div class="muted" style="font-size:12px">model trả lời (finish=stop)</div>`;
+      } else if (['tool', 'tool_duplicate', 'tool_blocked'].includes(t.event)) {
+        h += `<div class="act"><div class="h"><span>⚙️ ${esc(t.name)}(${esc(short(t.arguments, 110))})</span>${t.event !== 'tool' ? `<span class="pill warn">${GUARD[t.event]}</span>` : ''}</div>`
+          + `<div class="o">${renderObs(t.result)}<details><summary>Observation JSON</summary><pre>${esc(JSON.stringify(t.result, null, 2))}</pre></details></div></div>`;
+      } else if (t.event === 'final') {
+        h += `<div class="muted" style="font-size:12px">✅ final answer (${t.answer_chars} ký tự)</div>`;
+      } else {
+        h += `<div class="event">🛡️ ${esc(GUARD[t.event] || t.event)} ${t.missing ? '· ' + esc(Object.keys(t.missing).join(', ')) : ''}${t.seconds != null ? '· ' + t.seconds + 's' : ''}${t.error ? '· ' + esc(t.error) : ''}</div>`;
+      }
+    }
+    h += `</div>`;
+  }
+  return h;
+}
+
+function highlightUrls(text) {
+  return esc(text).replace(/https?:\/\/[^\s)\]&]+/g, m => `<mark>${m}</mark>`);
+}
+
+function renderDetail(pairs) {
+  const c0 = pairs[0][1];
+  let h = `<div class="q"><b>Câu hỏi · ${esc(c0.id)} · scenario ${esc(c0.scenario)}</b>${esc(c0.question)}<b style="margin-top:8px">Expected (chỉ judge thấy)</b><span class="muted">${esc(c0.expected)}</span></div>`;
+  h += `<div class="cols ${pairs.length === 1 ? 'one' : ''}">`;
+  for (const [label, c] of pairs) {
+    const g = c.grade, miss = missingSources(c);
+    const dims = g.dimensions ? Object.entries(g.dimensions).map(([k, v]) => `<span class="pill">${k} ${v}</span>`).join('') : '';
+    const viol = (g.mechanical?.violations || []).map(v => `<span class="pill bad">${esc(v)}</span>`).join('');
+    h += `<div class="col"><h2><span>${label === 'before' ? 'Before · commit 80424d7' : label === 'after' ? 'After · hybrid + guardrails' : 'Bonus · agent cải tiến'}</span>`
+      + `<span class="score">${g.score ?? '—'}<span class="muted" style="font-size:13px">/100 · ${esc(c.result.status)} · ${(c.result.usage || []).length} model calls</span></span></h2>`
+      + `<div class="dims">${dims}${viol}${miss.length ? `<span class="pill bad">thiếu URL incident: ${esc(miss.join(', '))}</span>` : `<span class="pill good">nguồn OK</span>`}</div>`
+      + `<div class="reason"><b>Judge:</b> ${esc(g.reason)}</div>`
+      + renderTrace(c)
+      + `<details open><summary>Final answer (URL được tô xanh)</summary><div class="answer">${highlightUrls(c.result.answer)}</div></details></div>`;
+  }
+  document.getElementById('detail').innerHTML = h + '</div>';
+}
+window.addEventListener('hashchange', () => {
+  const [ds, id] = location.hash.slice(1).split('/');
+  if ((ds === 'core' || ds === 'bonus') && (ds !== dataset || (id && id !== selected))) {
+    dataset = ds; selected = id || (ds === 'bonus' ? 'B4' : 'A2'); render();
+  }
+});
+load();
+</script>
+</body>
+</html>

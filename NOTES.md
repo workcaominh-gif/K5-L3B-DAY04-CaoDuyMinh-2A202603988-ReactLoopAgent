@@ -172,3 +172,18 @@ Kết luận trung thực:
 - Retry chỉ thử với 429 giả lập; HTTP 429 thật chỉ được kiểm tra bằng test sẵn có của tool, chưa chạy live.
 - Một lần chạy, judge cùng model.
 - Đếm incident trong câu trả lời (B10, A1) vẫn có thể sai: nên tính bằng code thay vì để model tự đếm.
+
+## Trace viewer (demo)
+
+`viewer/index.html` là trang tĩnh, không cần thư viện, đọc trực tiếp `eval_before.json`, `eval_after.json` và `eval_bonus.json`, không gọi API. Trang hiển thị:
+- Điểm tổng, số câu trả lời thiếu URL incident, số model calls, tool calls và token.
+- Danh sách case với Δ điểm.
+- Trace từng step theo dạng Thought → Action (tool + arguments) → Observation, kèm event guardrail như evidence gate, retry và loop guard.
+- Câu trả lời cuối với URL được tô màu.
+
+```bash
+python3 -m http.server 8765
+# mở http://localhost:8765/viewer/#core/A2   (case đã phân tích)
+#      http://localhost:8765/viewer/#core/H1   (trace nhiều bước, theo liên kết incident)
+#      http://localhost:8765/viewer/#bonus/B4  (retry 429 tối đa 3 lần)
+```
