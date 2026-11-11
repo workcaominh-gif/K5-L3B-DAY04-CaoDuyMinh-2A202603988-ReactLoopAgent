@@ -11,16 +11,28 @@
     --good:#a7f0c0;--goodb:#163a26;--bad:#ffc2cc;--badb:#4a1d29;--warn:#fcd9a0;--warnb:#47331a;--code:#232832;--think:#d4c2ff;--thinkb:#30254d}}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  header{padding:20px 16px 12px;max-width:1400px;margin:0 auto}
+  header{padding:20px 16px 8px;max-width:1400px;margin:0 auto}
   h1{margin:0;font-size:24px} .sub{color:var(--soft);font-size:14px}
   main{max-width:1400px;margin:0 auto;padding:0 16px 40px}
-  .tabs{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
-  .tabs button,.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:6px 14px;border-radius:999px;cursor:pointer;font:inherit}
-  .tabs button[aria-pressed=true]{background:var(--accent);color:var(--panel);border-color:var(--accent)}
-  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin:10px 0}
+  .vwrap{display:grid;grid-template-columns:minmax(280px,1.2fr) 1fr;gap:16px;align-items:center}
+  @media (max-width:860px){.vwrap{grid-template-columns:1fr}}
+  #chart{width:100%;height:auto;display:block}
+  #chart text{font:12px system-ui,sans-serif;fill:var(--soft)}
+  #chart .val{fill:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+  #chart .pt{fill:var(--panel);stroke:var(--accent);stroke-width:2;cursor:pointer}
+  #chart .pt.sel{fill:var(--accent)}
+  #chart .ln{fill:none;stroke:var(--accent);stroke-width:2}
+  #chart .base{stroke:var(--soft);stroke-dasharray:4 4;stroke-width:1}
+  .vinfo b{font-size:16px} .vinfo .hyp{font-size:13.5px;margin-top:4px}
+  .chips,.tabs{display:flex;gap:8px;margin:10px 0 0;flex-wrap:wrap}
+  .chips button,.tabs button{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:5px 12px;border-radius:999px;cursor:pointer;font:inherit;font-variant-numeric:tabular-nums}
+  .chips button[aria-pressed=true],.tabs button[aria-pressed=true]{background:var(--accent);color:var(--panel);border-color:var(--accent)}
+  .chips button:disabled{opacity:.45;cursor:not-allowed}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:12px 0}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
   .card .k{color:var(--soft);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
-  .card .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+  .card .v{font-size:21px;font-weight:700;font-variant-numeric:tabular-nums}
   .layout{display:grid;grid-template-columns:300px 1fr;gap:14px;align-items:start}
   @media (max-width:860px){.layout{grid-template-columns:1fr}}
   .list{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;max-height:78vh;overflow-y:auto}
@@ -29,7 +41,6 @@
   .row.head{cursor:default;font-size:12px;color:var(--soft);background:var(--panel);position:sticky;top:0}
   .delta.up{color:var(--good);font-weight:700} .delta.down{color:var(--bad);font-weight:700}
   .flag{font-size:11px;padding:0 6px;border-radius:999px;background:var(--badb);color:var(--bad);margin-left:4px}
-  .q{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:12px}
   .q b{font-size:12px;color:var(--soft);text-transform:uppercase;letter-spacing:.04em;display:block}
   .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .cols.one{grid-template-columns:1fr}
@@ -43,7 +54,8 @@
   .reason{font-size:13px;color:var(--soft);margin-bottom:10px}
   .step{border-left:3px solid var(--line);padding:2px 0 8px 12px;margin-left:4px}
   .step .sn{font-size:12px;font-weight:700;color:var(--soft)}
-  .thought{background:var(--thinkb);color:var(--think);border-radius:8px;padding:4px 10px;margin:4px 0;font-size:13px}
+  .thought{background:var(--thinkb);color:var(--think);border-radius:8px;padding:5px 10px;margin:4px 0;font-size:13px;white-space:pre-wrap;word-break:break-word}
+  .thought .lab{font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;display:block}
   .act{margin:6px 0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
   .act .h{padding:4px 10px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;background:var(--code);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
   .act .o{padding:4px 10px;font-size:12.5px}
@@ -52,25 +64,31 @@
   pre{white-space:pre-wrap;word-break:break-word;background:var(--code);padding:8px;border-radius:8px;font-size:12px;max-height:320px;overflow:auto;margin:4px 0}
   .answer{white-space:pre-wrap;word-break:break-word;background:var(--code);padding:10px;border-radius:8px;font-size:13px;max-height:420px;overflow:auto}
   .answer mark{background:var(--goodb);color:var(--good);border-radius:4px;padding:0 2px}
-  .ok{color:var(--good)} .err{color:var(--bad)}
-  .muted{color:var(--soft)}
-  .loader{background:var(--panel);border:1px dashed var(--line);border-radius:12px;padding:16px}
+  .ok{color:var(--good)} .err{color:var(--bad)} .muted{color:var(--soft)}
+  code{font-family:ui-monospace,Menlo,monospace;font-size:13px}
 </style>
 </head>
 <body>
 <header>
   <h1>Agent Trace Viewer</h1>
-  <div class="sub">Status Investigation Agent · Day 04 · Cao Duy Minh 2A202603988 · so sánh trace trước và sau cải tiến (Thought → Action → Observation)</div>
+  <div class="sub">Status Investigation Agent · Day 04 · Cao Duy Minh 2A202603988 · hybrid ReAct + function calling: Plan/Thought (English) → Action → Observation → câu trả lời (ngôn ngữ người dùng)</div>
 </header>
 <main>
-  <div class="tabs" role="tablist">
-    <button data-ds="core" aria-pressed="true">Core: before vs after (22 case)</button>
-    <button data-ds="bonus" aria-pressed="false">Bonus (10 case)</button>
-  </div>
-  <div id="loadmsg" class="loader" hidden>
+  <div id="loadmsg" class="panel" hidden>
     Không đọc được file eval qua HTTP. Chạy <code>python3 -m http.server 8765</code> tại thư mục repo rồi mở
-    <code>http://localhost:8765/viewer/</code>, hoặc chọn file:
-    <input type="file" id="files" multiple accept=".json">
+    <code>http://localhost:8765/viewer/</code>.
+  </div>
+  <div class="panel" id="versions">
+    <div><b>Lịch sử phiên bản</b> <span class="muted">· mỗi phiên bản một giả thuyết · cùng agent model, judge, max_steps và dataset · bấm một phiên bản để so với baseline v0</span></div>
+    <div class="vwrap">
+      <svg id="chart" viewBox="0 0 640 170" role="img" aria-label="Điểm tổng theo phiên bản"></svg>
+      <div class="vinfo" id="vinfo"></div>
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
+  <div class="tabs">
+    <button data-ds="core" aria-pressed="true">Core: v0 vs phiên bản chọn (22 case)</button>
+    <button data-ds="bonus" aria-pressed="false">Bonus (10 case)</button>
   </div>
   <div id="cards" class="cards"></div>
   <div class="layout">
@@ -79,33 +97,56 @@
   </div>
 </main>
 <script>
-const FILES = {before: '../eval_before.json', after: '../eval_after.json', bonus: '../eval_bonus.json'};
-const data = {};
-let dataset = 'core', selected = null;
+const runs = {};
+let versions = [], dataset = 'core', selected = 'A2', after = null;
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const short = (v, n=160) => { const s = typeof v === 'string' ? v : JSON.stringify(v); return s.length > n ? s.slice(0, n) + '…' : s; };
 
-async function load() {
-  for (const [k, url] of Object.entries(FILES)) {
-    try { const r = await fetch(url); if (r.ok) data[k] = await r.json(); } catch (e) {}
+function parseCsv(text) {
+  const rows = []; let row = [], cur = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"' && text[i+1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === ',') { row.push(cur); cur = ''; }
+    else if (ch === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+    else if (ch !== '\r') cur += ch;
   }
-  if (!data.before && !data.after) document.getElementById('loadmsg').hidden = false;
-  const hash = location.hash.slice(1).split('/');
-  if (hash[0] === 'bonus') dataset = 'bonus';
-  selected = hash[1] || (dataset === 'bonus' ? 'B4' : 'A2');
+  if (cur || row.length) { row.push(cur); rows.push(row); }
+  const head = rows.shift();
+  return rows.filter(r => r.length > 1).map(r => Object.fromEntries(head.map((h, i) => [h, r[i] ?? ''])));
+}
+async function getRun(file) {
+  if (!(file in runs)) {
+    try { const r = await fetch('../' + file); runs[file] = r.ok ? await r.json() : null; } catch (e) { runs[file] = null; }
+  }
+  return runs[file];
+}
+async function load() {
+  try {
+    const r = await fetch('../version_log.csv');
+    if (r.ok) versions = parseCsv(await r.text());
+  } catch (e) {}
+  if (!versions.length) versions = [{version: 'v0', run_file: 'eval_before.json', hypothesis: 'Baseline'}, {version: 'after', run_file: 'eval_after.json', hypothesis: ''}];
+  await Promise.all(versions.map(v => getRun(v.run_file)));
+  const [ds, id, ver] = location.hash.slice(1).split('/');
+  if (ds === 'bonus') dataset = 'bonus';
+  if (id) selected = id; else if (dataset === 'bonus') selected = 'B4';
+  const usable = versions.filter(v => runs[v.run_file] && v !== versions[0]);
+  after = versions.find(v => v.version === ver && runs[v.run_file]) || usable[usable.length - 1] || versions[0];
+  if (!runs[versions[0].run_file]) document.getElementById('loadmsg').hidden = false;
   render();
 }
-document.getElementById('files').addEventListener('change', async e => {
-  for (const f of e.target.files) {
-    const j = JSON.parse(await f.text());
-    const key = j.config?.dataset === 'bonus' ? 'bonus' : (/after/.test(f.name) ? 'after' : 'before');
-    data[key] = j;
-  }
-  document.getElementById('loadmsg').hidden = true; render();
-});
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
   dataset = b.dataset.ds; selected = dataset === 'bonus' ? 'B4' : 'A2'; render();
+});
+window.addEventListener('hashchange', () => {
+  const [ds, id, ver] = location.hash.slice(1).split('/');
+  const v = versions.find(x => x.version === ver && runs[x.run_file]);
+  if ((ds === 'core' || ds === 'bonus') && (ds !== dataset || (id && id !== selected) || (v && v !== after))) {
+    dataset = ds; if (id) selected = id; if (v) after = v; render();
+  }
 });
 
 // Same rule as the agent's evidence gate: each provider whose incident was read must have one of its URLs in the answer.
@@ -125,16 +166,56 @@ function stats(r) {
     bonus: r.summary.bonus_points_0_15};
 }
 
+function renderVersions() {
+  const pts = versions.map(v => ({v, score: runs[v.run_file]?.summary?.score_0_100 ?? (parseFloat(v.score_0_100) || null)})).filter(p => p.score != null);
+  const svg = document.getElementById('chart');
+  if (pts.length < 2) { svg.innerHTML = ''; }
+  else {
+    const W = 640, H = 170, L = 44, R = 20, T = 28, B = 34;
+    const lo = Math.floor(Math.min(...pts.map(p => p.score)) - 1), hi = Math.ceil(Math.max(...pts.map(p => p.score)) + 1);
+    const x = i => L + i * (W - L - R) / (pts.length - 1), y = s => T + (hi - s) * (H - T - B) / (hi - lo);
+    let g = '';
+    for (let s = lo; s <= hi; s++) g += `<line x1="${L}" x2="${W - R}" y1="${y(s)}" y2="${y(s)}" stroke="var(--line)"/><text x="${L - 8}" y="${y(s) + 4}" text-anchor="end">${s}</text>`;
+    g += `<line class="base" x1="${L}" x2="${W - R}" y1="${y(pts[0].score)}" y2="${y(pts[0].score)}"/>`;
+    g += `<polyline class="ln" points="${pts.map((p, i) => `${x(i)},${y(p.score)}`).join(' ')}"/>`;
+    pts.forEach((p, i) => {
+      g += `<circle class="pt ${p.v === after ? 'sel' : ''}" data-v="${esc(p.v.version)}" cx="${x(i)}" cy="${y(p.score)}" r="6"><title>${esc(p.v.version)}: ${p.score}</title></circle>`
+        + `<text class="val" x="${x(i) + (i === 0 ? 10 : 0)}" y="${y(p.score) - 11}" text-anchor="${i === 0 ? 'start' : i === pts.length - 1 ? 'end' : 'middle'}">${p.score}</text>`
+        + `<text x="${x(i)}" y="${H - 12}" text-anchor="middle">${esc(p.v.version)}</text>`;
+    });
+    svg.innerHTML = g + `<text x="${L}" y="14">Điểm tổng 0–100 (trục cắt ở ${lo}–${hi}; nét đứt = baseline v0)</text>`;
+    svg.querySelectorAll('.pt').forEach(c => c.onclick = () => pick(c.dataset.v));
+  }
+  document.getElementById('chips').innerHTML = versions.map(v => {
+    const ok = !!runs[v.run_file], s = runs[v.run_file]?.summary?.score_0_100 ?? v.score_0_100;
+    return `<button data-v="${esc(v.version)}" aria-pressed="${v === after}" ${ok ? '' : 'disabled title="Chưa có file run"'}>${esc(v.version)} · ${esc(s || '—')}</button>`;
+  }).join('');
+  document.querySelectorAll('#chips button').forEach(b => b.onclick = () => pick(b.dataset.v));
+  const a = after || {};
+  document.getElementById('vinfo').innerHTML = `<b>${esc(a.version || '')}</b> <span class="muted">· commit <code>${esc(a.commit || '—')}</code> · sửa: ${esc(a.files_changed || '—')}</span>`
+    + `<div class="hyp"><b>Giả thuyết:</b> ${esc(a.hypothesis || '—')}</div>`
+    + `<div class="muted" style="font-size:12.5px;margin-top:4px">Thiếu URL incident: ${esc(a.missing_incident_url || '—')} · file: <code>${esc(a.run_file || '')}</code></div>`;
+}
+function pick(ver) {
+  const v = versions.find(x => x.version === ver);
+  if (v && runs[v.run_file]) { after = v; if (dataset === 'bonus') dataset = 'core'; render(); }
+}
+
 function render() {
-  location.hash = dataset + '/' + selected;
+  location.hash = dataset + '/' + selected + '/' + (after?.version || '');
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.ds === dataset));
-  const sets = dataset === 'core' ? [['before', data.before], ['after', data.after]] : [['bonus', data.bonus]];
+  renderVersions();
+  const base = versions[0];
+  const sets = dataset === 'core'
+    ? (after === base ? [[base.version, runs[base.run_file]]] : [[base.version, runs[base.run_file]], [after.version, runs[after.run_file]]])
+    : [['bonus', runs['eval_bonus.json'] !== undefined ? runs['eval_bonus.json'] : null]];
+  if (dataset === 'bonus' && runs['eval_bonus.json'] === undefined) { getRun('eval_bonus.json').then(render); return; }
   const present = sets.filter(([, r]) => r);
   const cards = document.getElementById('cards');
-  if (!present.length) { cards.innerHTML = ''; document.getElementById('list').innerHTML = ''; document.getElementById('detail').innerHTML = ''; return; }
+  if (!present.length) { cards.innerHTML = '<div class="card">Chưa có dữ liệu cho mục này.</div>'; document.getElementById('list').innerHTML = ''; document.getElementById('detail').innerHTML = ''; return; }
   const S = present.map(([k, r]) => [k, stats(r), r.config]);
   const card = (k, v) => `<div class="card"><div class="k">${k}</div><div class="v">${v}</div></div>`;
-  const both = (f) => S.map(([, s]) => f(s)).join(' → ');
+  const both = f => S.map(([, s]) => f(s)).join(' → ');
   cards.innerHTML = card('Điểm tổng', both(s => s.score ?? 'null'))
     + (dataset === 'bonus' ? card('Điểm bonus', (S[0][1].bonus ?? 'null') + '/15') : '')
     + card('Thiếu URL incident', both(s => `${s.missing}/${s.total}`))
@@ -143,8 +224,9 @@ function render() {
     + card('Agent · judge', `<span style="font-size:13px">${esc(S[0][2].model)} · ${esc(S[0][2].judge_model)}<br>max_steps ${S[0][2].max_steps}</span>`);
 
   const ids = present[0][1].cases.map(c => c.id);
+  if (!ids.includes(selected)) selected = ids[0];
   const byId = Object.fromEntries(present.map(([k, r]) => [k, Object.fromEntries(r.cases.map(c => [c.id, c]))]));
-  let html = `<div class="row head"><span>Case</span><span>${present[0][0]}</span><span>${present[1]?.[0] ?? ''}</span><span>Δ</span></div>`;
+  let html = `<div class="row head"><span>Case</span><span>${esc(present[0][0])}</span><span>${esc(present[1]?.[0] ?? '')}</span><span>Δ</span></div>`;
   for (const id of ids) {
     const a = byId[present[0][0]][id], b = present[1] ? byId[present[1][0]][id] : null;
     const sa = a.grade.score, sb = b?.grade.score;
@@ -156,7 +238,6 @@ function render() {
   }
   const list = document.getElementById('list'); list.innerHTML = html;
   list.querySelectorAll('.row[data-id]').forEach(r => r.onclick = () => { selected = r.dataset.id; render(); });
-  if (!ids.includes(selected)) selected = ids[0];
   renderDetail(present.map(([k]) => [k, byId[k][selected]]));
 }
 
@@ -179,26 +260,33 @@ function renderObs(r) {
 
 const GUARD = {validation_missing_source: 'Evidence gate: thiếu URL nguồn → yêu cầu viết lại', validation_sources_appended: 'Evidence gate: code tự gắn nguồn',
   tool_duplicate: 'Loop guard: call trùng, không chạy lại', tool_blocked: 'Retry guard: đã đủ số lần thử', retry_wait: 'Chờ retry-after rồi thử lại',
-  loop_detected: 'Loop guard: 2 step không tiến triển', wrap_up: 'Lượt cuối / budget: yêu cầu kết luận', provider_error: 'Lỗi provider', max_steps: 'Hết max_steps', error: 'Lỗi'};
+  loop_detected: 'Loop guard: 2 step không tiến triển', validation_foreign_script: 'Kiểm tra ngôn ngữ: câu trả lời lẫn chữ ngoài tiếng Việt/Anh → yêu cầu viết lại', wrap_up: 'Lượt cuối / budget: yêu cầu kết luận', provider_error: 'Lỗi provider', max_steps: 'Hết max_steps', error: 'Lỗi'};
 
+function thoughtBox(text) {
+  const isPlan = /^\s*Plan\s*:/i.test(text);
+  return `<div class="thought"><span class="lab">${isPlan ? '🧭 Plan + Thought' : '💭 Thought'}</span>${esc(text)}</div>`;
+}
 function renderTrace(c) {
   const steps = {};
   for (const t of c.result.trace || []) (steps[t.step ?? 0] ??= []).push(t);
-  // Agent ghi retry_wait trước event tool tương ứng; hiển thị nó ngay sau tool đó cho dễ đọc.
+  // The agent logs retry_wait before its tool event; show it right after that tool so the order reads naturally.
   for (const evs of Object.values(steps)) for (let i = 0; i < evs.length - 1; i++)
     if (evs[i].event === 'retry_wait' && evs[i + 1].event === 'tool') { [evs[i], evs[i + 1]] = [evs[i + 1], evs[i]]; i++; }
   let h = '';
   for (const [n, evs] of Object.entries(steps)) {
-    h += `<div class="step"><div class="sn">STEP ${n}</div>`;
+    h += `<div class="step"><div class="sn">${n === '0' ? 'SETUP' : 'STEP ' + n}</div>`;
     for (const t of evs) {
       if (t.event === 'model') {
-        const th = t.thought || '';
-        if (th) h += `<div class="thought">💭 ${esc(th)}</div>`;
-        else if ((t.tool_calls?.length || t.actions?.length)) h += `<div class="thought muted" style="opacity:.75">💭 (model không ghi Thought)</div>`;
+        if (t.thought) h += thoughtBox(t.thought);
+        else if (t.tool_calls?.length || t.actions?.length) h += `<div class="thought muted" style="opacity:.75">💭 (model không ghi Thought)</div>`;
         if (t.finish === 'stop') h += `<div class="muted" style="font-size:12px">model trả lời (finish=stop)</div>`;
+      } else if (t.event === 'final_thought') {
+        h += thoughtBox(t.thought) + `<div class="muted" style="font-size:12px">↑ ghi chú nội bộ được tách khỏi câu trả lời và chuyển vào trace</div>`;
       } else if (['tool', 'tool_duplicate', 'tool_blocked'].includes(t.event)) {
         h += `<div class="act"><div class="h"><span>⚙️ ${esc(t.name)}(${esc(short(t.arguments, 110))})</span>${t.event !== 'tool' ? `<span class="pill warn">${GUARD[t.event]}</span>` : ''}</div>`
           + `<div class="o">${renderObs(t.result)}<details><summary>Observation JSON</summary><pre>${esc(JSON.stringify(t.result, null, 2))}</pre></details></div></div>`;
+      } else if (t.event === 'environment') {
+        h += `<div class="muted" style="font-size:12px">🧰 Tools: ${(t.tools || []).map(x => `${esc(x.name)}(${esc((x.parameters || []).join(', '))})`).join(' · ')}</div>`;
       } else if (t.event === 'final') {
         h += `<div class="muted" style="font-size:12px">✅ final answer (${t.answer_chars} ký tự)</div>`;
       } else {
@@ -213,30 +301,30 @@ function renderTrace(c) {
 function highlightUrls(text) {
   return esc(text).replace(/https?:\/\/[^\s)\]&]+/g, m => `<mark>${m}</mark>`);
 }
-
+function colTitle(label) {
+  if (label === 'bonus') return 'Bonus · agent hiện tại';
+  const v = versions.find(x => x.version === label) || {};
+  return `${esc(label)}${v === versions[0] ? ' · baseline' : ''} <span class="muted" style="font-weight:400;font-size:13px">commit ${esc(v.commit || '—')}</span>`;
+}
 function renderDetail(pairs) {
   const c0 = pairs[0][1];
-  let h = `<div class="q"><b>Câu hỏi · ${esc(c0.id)} · scenario ${esc(c0.scenario)}</b>${esc(c0.question)}<b style="margin-top:8px">Expected (chỉ judge thấy)</b><span class="muted">${esc(c0.expected)}</span></div>`;
+  let h = `<div class="panel q"><b>Câu hỏi · ${esc(c0.id)} · scenario ${esc(c0.scenario)}</b>${esc(c0.question)}<b style="margin-top:8px">Expected (chỉ judge thấy)</b><span class="muted">${esc(c0.expected)}</span></div>`;
   h += `<div class="cols ${pairs.length === 1 ? 'one' : ''}">`;
   for (const [label, c] of pairs) {
     const g = c.grade, miss = missingSources(c);
     const dims = g.dimensions ? Object.entries(g.dimensions).map(([k, v]) => `<span class="pill">${k} ${v}</span>`).join('') : '';
     const viol = (g.mechanical?.violations || []).map(v => `<span class="pill bad">${esc(v)}</span>`).join('');
-    h += `<div class="col"><h2><span>${label === 'before' ? 'Before · commit 80424d7' : label === 'after' ? 'After · hybrid + guardrails' : 'Bonus · agent cải tiến'}</span>`
+    const ledger = c.result.evidence_ledger
+      ? `<details><summary>Evidence ledger (code tạo, đưa vào system prompt trước mỗi lượt gọi model)</summary><pre>${esc(c.result.evidence_ledger)}</pre></details>` : '';
+    h += `<div class="col"><h2><span>${colTitle(label)}</span>`
       + `<span class="score">${g.score ?? '—'}<span class="muted" style="font-size:13px">/100 · ${esc(c.result.status)} · ${(c.result.usage || []).length} model calls</span></span></h2>`
       + `<div class="dims">${dims}${viol}${miss.length ? `<span class="pill bad">thiếu URL incident: ${esc(miss.join(', '))}</span>` : `<span class="pill good">nguồn OK</span>`}</div>`
-      + `<div class="reason"><b>Judge:</b> ${esc(g.reason)}</div>`
-      + renderTrace(c)
+      + `<div class="reason"><b>Judge:</b> ${esc(g.reason)}${g.improvement ? `<br><b>Đề xuất:</b> ${esc(g.improvement)}` : ''}</div>`
+      + renderTrace(c) + ledger
       + `<details open><summary>Final answer (URL được tô xanh)</summary><div class="answer">${highlightUrls(c.result.answer)}</div></details></div>`;
   }
   document.getElementById('detail').innerHTML = h + '</div>';
 }
-window.addEventListener('hashchange', () => {
-  const [ds, id] = location.hash.slice(1).split('/');
-  if ((ds === 'core' || ds === 'bonus') && (ds !== dataset || (id && id !== selected))) {
-    dataset = ds; selected = id || (ds === 'bonus' ? 'B4' : 'A2'); render();
-  }
-});
 load();
 </script>
 </body>

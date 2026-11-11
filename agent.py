@@ -101,7 +101,13 @@ def _when(ts):
     return ts or 'unknown'
 
 
-def _evidence_ledger(trace):
+def _tool_facts(schemas):
+    """Tool names and their parameter names, straight from the schemas the model is given."""
+    return [{'name': s.get('function', {}).get('name'),
+             'parameters': list(s.get('function', {}).get('parameters', {}).get('properties', {}))} for s in schemas]
+
+
+def _evidence_ledger(trace, tool_facts=()):
     """Facts computed by code from executed tool calls. Rebuilt before every model call and placed in the
     system prompt, so the final answer is written under a guided system prompt that already states what was
     read, what was only listed, what failed and which limits may be claimed. Only allow-listed fields are
@@ -183,6 +189,11 @@ def _evidence_ledger(trace):
     if not_found:
         out.append('Not found:')
         out += [f'- {x}' for x in not_found]
+    if tool_facts:
+        # Claims about what a tool can or cannot do must be checkable: these lines mirror the environment trace event.
+        out.append('Tools and their parameters (from the tool schema; a tool can only filter by these, so anything else, '
+                   'such as a date range or a page number, cannot be requested unless listed):')
+        out += [f"- {t['name']}({', '.join(t['parameters'])})" for t in tool_facts]
     out.append('Limits you may state (state only these, in your own words):')
     out += [f'- {x}' for x in dict.fromkeys(limits)] or ['- none recorded']
     out.append('Sources to cite: ' + (', '.join(dict.fromkeys(x for x in sources if x)) or 'none'))
@@ -190,6 +201,7 @@ def _evidence_ledger(trace):
     return '\n'.join(out)
 
 
+FOREIGN_SCRIPT = re.compile('[\u0400-\u04FF\u0590-\u06FF\u0900-\u0DFF\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]')
 NOTE_LINE = re.compile(r'^\s*(Plan|Thought)\s*:', re.I)
 
 
@@ -306,7 +318,9 @@ def run_agent(question, provider, tools, max_steps=6):
     messages = [{'role': 'system', 'content': base_system},
                 {'role': 'user', 'content': question}]
     ledger = ''
-    trace, usage = [], []
+    tool_facts = _tool_facts(schemas)
+    # Record the environment in the trace so statements about tool abilities can be checked against it.
+    trace, usage = [{'event': 'environment', 'step': 0, 'tools': tool_facts}], []
     attempts = {}       # signature -> số lần đã chạy thật
     succeeded = {}      # signature -> result thành công (để chặn call trùng)
     sources = {}        # provider -> set URL incident đã đọc thành công
@@ -335,7 +349,7 @@ def run_agent(question, provider, tools, max_steps=6):
             wrap_up_sent = True
 
         # Guided final answer: the system prompt carries a code-built evidence ledger of everything observed.
-        new_ledger = _evidence_ledger(trace)
+        new_ledger = _evidence_ledger(trace, tool_facts)
         if new_ledger != ledger:
             ledger = new_ledger
             messages[0] = {'role': 'system', 'content': base_system + '\n\n' + ledger}
@@ -418,6 +432,14 @@ def run_agent(question, provider, tools, max_steps=6):
         answer, final_notes = _split_notes(message.get('content') or '')
         if final_notes:
             trace.append({'event': 'final_thought', 'step': step, 'thought': _preview(final_notes, 800)})
+        # Language check: the answer must not contain scripts (Cyrillic, CJK, Arabic...) absent from the question.
+        stray = sorted(set(FOREIGN_SCRIPT.findall(answer)) - set(FOREIGN_SCRIPT.findall(question)))
+        if stray and revisions < MAX_SOURCE_REVISIONS:
+            revisions += 1
+            trace.append({'event': 'validation_foreign_script', 'step': step, 'characters': ''.join(stray)[:40]})
+            messages.append({'role': 'system', 'content': '[Agent runtime] The answer contains characters from another writing system '
+                             f'({"".join(stray)[:40]}). Rewrite the same answer using only the user\'s language and verbatim English quotes. Call no more tools.'})
+            continue
         # Evidence gate: mỗi provider đã đọc incident thành công phải có ít nhất 1 URL incident trong answer.
         missing = {p: sorted(urls) for p, urls in sources.items() if not any(u in answer for u in urls)}
         if missing:

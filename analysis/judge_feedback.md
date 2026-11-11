@@ -31,6 +31,15 @@ motivated it. Cases with no deduction in a group are not listed. Quotes are shor
 | R11b | "nêu ngay trong phần kết luận rằng Cloudflare Spectrum trả về TimeoutError … và lý do không thể đánh dấu operational" | H7 | Name the failed part and its error in the conclusion. |
 | R1b | "gọi ba incident là 'gần đây nhất' trong khi pfbmpxxfq1cy mới hơn" | E1, H5 | State the selection criterion ("the 3 most recently updated incidents whose name contains Actions"), never just "the most recent". |
 
+## Added after reading every v6 judgment (`versions/v6/eval.json`, 94.27)
+
+| # | Deduction pattern (judge's words) | Cases | Fix in v7 |
+|---|---|---|---|
+| R15b | "'tối đa 5 kết quả mỗi lần', 'không lọc theo ngày' … không được trace xác nhận trực tiếp" (79 điểm); "ghi 'limit từ tool' là lý do không có trong trace" | H8, A6 | **Code:** the trace now starts with an `environment` event listing each tool's parameters, and the ledger repeats them, so "the tool accepts only provider and component" is checkable. **Prompt:** tool abilities only from those lines; numbers without reasons; never state a maximum or page size. |
+| R1c | "ba incident này là toàn bộ các incident có 'Actions' trong số 5 kết quả, không phải 'cập nhật gần nhất'"; "trong 23 incident khớp vẫn có thể có thêm incident Actions chưa được liệt kê" | A1, H5 | Describe the selection as set membership: "the incidents with <component> in their name among the M returned; N matched in total; the rest were not seen". |
+| R17 | "dòng snapshot lẫn từ tiếng Nga 'для'"; "captured_at chưa nhất quán với dữ liệu gốc" | H1 | **Code:** language check — characters from a script not used in the question trigger one rewrite (`validation_foreign_script`). **Prompt:** per-provider captured_at copied exactly. |
+| R3b | "'không phải sập toàn cầu' hơi vượt dữ liệu"; "gọi công cụ là 'công cụ tìm kiếm' dù thực tế là tra cứu theo ID"; "'degraded performance' chỉ xuất hiện trong nguồn GitHub … ghép như thể áp dụng cho cả hai" | H3, A8 | "The data does not record that" wording; name the tool by what it did; keep each source's wording with its own source. |
+
 ## What v5 (written before this analysis) got wrong
 
 v5's output format still contains "plus the status page of each provider you checked" (cause of R2) and has no

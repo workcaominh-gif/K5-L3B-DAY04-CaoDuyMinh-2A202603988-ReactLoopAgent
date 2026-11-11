@@ -231,6 +231,33 @@ class EvidenceLedgerTests(unittest.TestCase):
         self.assertIn('more updates exist after offset 2', result['evidence_ledger'])
 
 
+class VerifiableClaimsTests(unittest.TestCase):
+    """v7: what the agent may say about tools and languages is checkable in the trace."""
+    def test_trace_starts_with_available_tools(self):
+        result = run_agent('x', FakeProvider([final()]), StatusTools())
+        first = result['trace'][0]
+        self.assertEqual(first['event'], 'environment')
+        self.assertIn({'name': 'get_status', 'parameters': ['provider', 'component']}, first['tools'])
+
+    def test_ledger_lists_tool_parameters(self):
+        fake = FakeProvider([tool_call('1', 'get_status', '{"provider":"github"}'), final()])
+        result = run_agent('x', fake, StatusTools())
+        self.assertIn('- get_status(provider, component)', result['evidence_ledger'])
+        self.assertIn('- get_incident_details(provider, incident_id)', result['evidence_ledger'])
+
+    def test_foreign_script_in_answer_gets_one_revision(self):
+        fake = FakeProvider([final('Snapshot для GitHub: ổn.'), final('Snapshot cho GitHub: ổn.')])
+        result = run_agent('GitHub thế nào?', fake, StatusTools())
+        self.assertEqual(result['answer'], 'Snapshot cho GitHub: ổn.')
+        self.assertTrue(any(t['event'] == 'validation_foreign_script' for t in result['trace']))
+        self.assertEqual(fake.histories[1][-1]['role'], 'system')
+
+    def test_script_used_by_the_user_is_allowed(self):
+        fake = FakeProvider([final('GitHub 正常')])
+        result = run_agent('GitHub 正常吗?', fake, StatusTools())
+        self.assertFalse(any(t['event'] == 'validation_foreign_script' for t in result['trace']))
+
+
 class HybridTraceTests(unittest.TestCase):
     def test_leading_thought_moves_from_answer_to_trace(self):
         result = run_agent('x', FakeProvider([final('Thought: enough evidence -> answer.\n\n**Kết luận:** ổn.')]), StatusTools())
@@ -245,7 +272,7 @@ class HybridTraceTests(unittest.TestCase):
         step = tool_call('1', 'get_status', '{"provider":"github"}')
         step['message']['content'] = 'Thought: cần trạng thái GitHub trước.'
         result = run_agent('x', FakeProvider([step, final()]), StatusTools())
-        model_event = result['trace'][0]
+        model_event = next(t for t in result['trace'] if t['event'] == 'model')
         self.assertEqual(model_event['thought'], 'Thought: cần trạng thái GitHub trước.')
         self.assertEqual(model_event['actions'][0]['name'], 'get_status')
 
