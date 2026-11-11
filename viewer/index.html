@@ -171,6 +171,8 @@ function renderObs(r) {
   if (r.next_offset != null) bits.push(`next_offset ${r.next_offset}`);
   if (r.distractors) bits.push(`${r.distractors.length} mục nhiễu`);
   if (r.related_incidents_not_read) bits.push(`<span class="pill warn">gợi ý đọc tiếp: ${r.related_incidents_not_read.map(x => esc(x.incident_id)).join(', ')}</span>`);
+  if (r.untrusted_instruction_detected) bits.push(`<span class="pill bad">phát hiện câu giống lệnh trong dữ liệu (untrusted)</span>`);
+  else if (r.trust_boundary) bits.push(`<span class="pill">trust_boundary</span>`);
   if (r.url) bits.push(`<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.url)}</a>`);
   return `<span class="ok">✓</span> ` + bits.join(' · ');
 }
