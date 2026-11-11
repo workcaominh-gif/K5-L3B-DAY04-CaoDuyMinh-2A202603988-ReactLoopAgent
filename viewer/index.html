@@ -60,6 +60,13 @@
   .act .h{padding:4px 10px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;background:var(--code);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
   .act .o{padding:4px 10px;font-size:12.5px}
   .event{margin:6px 0;padding:4px 10px;border-radius:8px;font-size:12.5px;background:var(--warnb);color:var(--warn)}
+  .r{display:grid;grid-template-columns:118px 1fr;gap:8px;margin:5px 0;align-items:start}
+  .r .rl{font-weight:700;font-size:12px;border-radius:6px;padding:3px 8px;text-align:center;color:#fff}
+  .r .rb{font-size:13px;min-width:0;word-break:break-word;padding-top:2px}
+  .r.th .rl{background:#d9534f} .r.ac .rl{background:#2e8b3d} .r.ob .rl{background:#4a6fa5}
+  .r.fa .rl{background:#b23a48} .r.sg .rl{background:#b7791f}
+  .r.th .rb{color:var(--think)} .r.muted{opacity:.7}
+  @media (max-width:600px){.r{grid-template-columns:1fr}}
   details summary{cursor:pointer;color:var(--accent);font-size:12px}
   pre{white-space:pre-wrap;word-break:break-word;background:var(--code);padding:8px;border-radius:8px;font-size:12px;max-height:320px;overflow:auto;margin:4px 0}
   .answer{white-space:pre-wrap;word-break:break-word;background:var(--code);padding:10px;border-radius:8px;font-size:13px;max-height:420px;overflow:auto}
@@ -71,7 +78,7 @@
 <body>
 <header>
   <h1>Agent Trace Viewer</h1>
-  <div class="sub">Status Investigation Agent · Day 04 · Cao Duy Minh 2A202603988 · hybrid ReAct + function calling: Plan/Thought (English) → Action → Observation → câu trả lời (ngôn ngữ người dùng)</div>
+  <div class="sub">Status Investigation Agent · Day 04 · Cao Duy Minh 2A202603988 · ReAct: Thought → Action → Observation → … → Final Answer (Action qua function calling; Thought tiếng Anh, câu trả lời tiếng Việt)</div>
 </header>
 <main>
   <div id="loadmsg" class="panel" hidden>
@@ -265,37 +272,40 @@ const GUARD = {validation_missing_source: 'Evidence gate: thiếu URL nguồn �
   tool_duplicate: 'Loop guard: call trùng, không chạy lại', tool_blocked: 'Retry guard: đã đủ số lần thử', retry_wait: 'Chờ retry-after rồi thử lại',
   loop_detected: 'Loop guard: 2 step không tiến triển', validation_foreign_script: 'Kiểm tra ngôn ngữ: câu trả lời lẫn chữ ngoài tiếng Việt/Anh → yêu cầu viết lại', wrap_up: 'Lượt cuối / budget: yêu cầu kết luận', provider_error: 'Lỗi provider', max_steps: 'Hết max_steps', error: 'Lỗi'};
 
-function thoughtBox(text) {
-  const isPlan = /^\s*Plan\s*:/i.test(text);
-  return `<div class="thought"><span class="lab">${isPlan ? '🧭 Plan + Thought' : '💭 Thought'}</span>${esc(text)}</div>`;
+// ReAct trace in the format of the Day 4 slides: Thought n -> Action n -> Observation n ... -> Final Answer.
+function rLine(kind, label, body, extra = '') {
+  return `<div class="r ${kind}"><span class="rl">${label}</span><div class="rb">${body}${extra}</div></div>`;
 }
 function renderTrace(c) {
   const steps = {};
   for (const t of c.result.trace || []) (steps[t.step ?? 0] ??= []).push(t);
-  // The agent logs retry_wait before its tool event; show it right after that tool so the order reads naturally.
-  for (const evs of Object.values(steps)) for (let i = 0; i < evs.length - 1; i++)
-    if (evs[i].event === 'retry_wait' && evs[i + 1].event === 'tool') { [evs[i], evs[i + 1]] = [evs[i + 1], evs[i]]; i++; }
-  let h = '';
-  for (const [n, evs] of Object.entries(steps)) {
-    h += `<div class="step"><div class="sn">${n === '0' ? 'SETUP' : 'STEP ' + n}</div>`;
-    for (const t of evs) {
-      if (t.event === 'model') {
-        if (t.thought) h += thoughtBox(t.thought);
-        else if (t.tool_calls?.length || t.actions?.length) h += `<div class="thought muted" style="opacity:.75">💭 (model không ghi Thought)</div>`;
-        if (t.finish === 'stop') h += `<div class="muted" style="font-size:12px">model trả lời (finish=stop)</div>`;
-      } else if (t.event === 'final_thought') {
-        h += thoughtBox(t.thought) + `<div class="muted" style="font-size:12px">↑ ghi chú nội bộ được tách khỏi câu trả lời và chuyển vào trace</div>`;
-      } else if (['tool', 'tool_duplicate', 'tool_blocked'].includes(t.event)) {
-        h += `<div class="act"><div class="h"><span>⚙️ ${esc(t.name)}(${esc(short(t.arguments, 110))})</span>${t.event !== 'tool' ? `<span class="pill warn">${GUARD[t.event]}</span>` : ''}</div>`
-          + `<div class="o">${renderObs(t.result)}<details><summary>Observation JSON</summary><pre>${esc(JSON.stringify(t.result, null, 2))}</pre></details></div></div>`;
-      } else if (t.event === 'environment') {
-        h += `<div class="muted" style="font-size:12px">🧰 Tools: ${(t.tools || []).map(x => `${esc(x.name)}(${esc((x.parameters || []).join(', '))})`).join(' · ')}</div>`;
-      } else if (t.event === 'final') {
-        h += `<div class="muted" style="font-size:12px">✅ final answer (${t.answer_chars} ký tự)</div>`;
-      } else {
-        h += `<div class="event">🛡️ ${esc(GUARD[t.event] || t.event)} ${t.missing ? '· ' + esc(Object.keys(t.missing).join(', ')) : ''}${t.seconds != null ? '· ' + t.seconds + 's' : ''}${t.error ? '· ' + esc(t.error) : ''}</div>`;
-      }
-    }
+  let h = '', n = 0;
+  for (const [k, evs] of Object.entries(steps)) {
+    if (k === '0') continue;
+    const model = evs.find(t => t.event === 'model');
+    const actions = evs.filter(t => ['tool', 'tool_duplicate', 'tool_blocked'].includes(t.event));
+    const guards = evs.filter(t => !['model', 'tool', 'tool_duplicate', 'tool_blocked', 'final', 'final_thought', 'retry_wait'].includes(t.event));
+    const waits = evs.filter(t => t.event === 'retry_wait');
+    const finalThought = evs.find(t => t.event === 'final_thought');
+    const isFinal = evs.some(t => t.event === 'final');
+    n += 1;
+    h += `<div class="step"><div class="sn">STEP ${k} · model call ${k}</div>`;
+    const thought = model?.thought || finalThought?.thought || '';
+    if (thought) h += rLine('th', `Thought ${n}`, esc(thought).replace(/\n/g, '<br>'));
+    else if (actions.length) h += rLine('th muted', `Thought ${n}`, '<i>(model không ghi Thought ở bước này)</i>');
+    actions.forEach((t, i) => {
+      const tag = actions.length > 1 ? `${n}${String.fromCharCode(97 + i)}` : `${n}`;
+      const guard = t.event !== 'tool' ? ` <span class="pill warn">${GUARD[t.event]}</span>` : '';
+      h += rLine('ac', `Action ${tag}`, `<code>${esc(t.name)}(${esc(short(t.arguments, 120))})</code>${guard}`);
+      h += rLine('ob', `Observation ${tag}`, renderObs(t.result),
+        `<details><summary>JSON</summary><pre>${esc(JSON.stringify(t.result, null, 2))}</pre></details>`);
+    });
+    waits.forEach(t => { h += rLine('sg', 'Safeguard', `Chờ retry-after ${t.seconds}s rồi cho phép thử lại`); });
+    guards.forEach(t => {
+      h += rLine('sg', 'Safeguard', `${esc(GUARD[t.event] || t.event)}${t.missing ? ' · ' + esc(Object.keys(t.missing).join(', ')) : ''}${t.codes ? ' · ' + esc(t.codes.join(', ')) : ''}${t.error ? ' · ' + esc(t.error) : ''}`);
+    });
+    if (isFinal) h += rLine('fa', 'Final Answer', `xem bên dưới (${evs.find(t => t.event === 'final').answer_chars} ký tự)`);
+    else if (model?.finish === 'stop' && !actions.length && !guards.length) h += rLine('fa muted', 'Draft answer', 'bị evidence gate / output guard trả lại để viết lại');
     h += `</div>`;
   }
   return h;
