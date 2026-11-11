@@ -17,6 +17,7 @@ Guardrails (slide Day 4 "Max Iterations Safeguard"):
     observation lỗi ghi rõ attempt và retries_left
   - loop guard: call trùng đã thành công không chạy lại; 2 step liền không có dữ liệu mới thì yêu cầu kết luận
   - token budget
+  - provider trả finish=refusal: gọi lại đúng lượt đó một lần; lặp lại thì kết thúc với status 'error'
   - lỗi tool là observation; lỗi provider hoặc output bị cắt kết thúc run với status 'error'
 
 Prompt (v1, theo slide Day 3): prompts/system_prompt.md gồm Persona -> Rules -> Capabilities -> Constraints
@@ -54,6 +55,7 @@ SUSPICIOUS = re.compile(r'(ignore (the )?(previous|prior|user|system)|system ove
 INCIDENT_LINK = re.compile(r'https?://[^\s)\]"\']+/incidents/([a-z0-9]{8,16})', re.I)
 PRETTY = {'github': 'GitHub', 'cloudflare': 'Cloudflare', 'vercel': 'Vercel', 'npm': 'npm', 'digitalocean': 'DigitalOcean'}
 MAX_SOURCE_REVISIONS = 2
+REFUSAL_FINISHES = ('refusal', 'content_filter')
 
 PREVIEW_CHARS = 300
 TOOL_TIMEOUT_SECONDS = 20
@@ -366,6 +368,11 @@ def run_agent(question, provider, tools, max_steps=6):
             messages[0] = {'role': 'system', 'content': base_system + '\n\n' + ledger}
         try:
             response = provider.complete(messages, schemas)
+            if response.get('finish') in REFUSAL_FINISHES:
+                # Controlled retry: an API-side refusal can be transient; retry the same call once, then give up.
+                trace.append({'event': 'model_refusal_retry', 'step': step, 'finish': response.get('finish')})
+                usage.append(response.get('usage') or {})
+                response = provider.complete(messages, schemas)
         except Exception as exc:
             error = f'{type(exc).__name__}: {str(exc)[:200]}'
             trace.append({'event': 'provider_error', 'step': step, 'error': error})

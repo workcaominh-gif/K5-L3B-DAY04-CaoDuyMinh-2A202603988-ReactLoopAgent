@@ -270,7 +270,7 @@ function renderObs(r) {
 
 const GUARD = {validation_missing_source: 'Evidence gate: thiếu URL nguồn → yêu cầu viết lại', validation_sources_appended: 'Evidence gate: code tự gắn nguồn', validation_injection_echo: 'Output guard: câu trả lời lặp lại mã từ chỉ dẫn giả → yêu cầu viết lại', validation_injection_redacted: 'Output guard: code xóa mã bị lặp lại',
   tool_duplicate: 'Loop guard: call trùng, không chạy lại', tool_blocked: 'Retry guard: đã đủ số lần thử', retry_wait: 'Chờ retry-after rồi thử lại',
-  loop_detected: 'Loop guard: 2 step không tiến triển', validation_foreign_script: 'Kiểm tra ngôn ngữ: câu trả lời lẫn chữ ngoài tiếng Việt/Anh → yêu cầu viết lại', wrap_up: 'Lượt cuối / budget: yêu cầu kết luận', provider_error: 'Lỗi provider', max_steps: 'Hết max_steps', error: 'Lỗi'};
+  loop_detected: 'Loop guard: 2 step không tiến triển', model_refusal_retry: 'API từ chối (refusal) → gọi lại lượt này 1 lần', validation_foreign_script: 'Kiểm tra ngôn ngữ: câu trả lời lẫn chữ ngoài tiếng Việt/Anh → yêu cầu viết lại', wrap_up: 'Lượt cuối / budget: yêu cầu kết luận', provider_error: 'Lỗi provider', max_steps: 'Hết max_steps', error: 'Lỗi'};
 
 // ReAct trace in the format of the Day 4 slides: Thought n -> Action n -> Observation n ... -> Final Answer.
 function rLine(kind, label, body, extra = '') {

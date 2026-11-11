@@ -73,6 +73,20 @@ class TimeoutAndErrorTests(unittest.TestCase):
         self.assertEqual(run_agent('x', fake, Broken())['status'], 'completed')
         self.assertEqual(json.loads(fake.histories[1][-1]['content'])['error'], 'TOOL_EXCEPTION')
 
+    def test_refusal_is_retried_once(self):
+        refusal = final('')
+        refusal['finish'] = 'refusal'
+        fake = FakeProvider([refusal, final('ok')])
+        result = run_agent('x', fake, StatusTools())
+        self.assertEqual(result['status'], 'completed')
+        self.assertTrue(any(t['event'] == 'model_refusal_retry' for t in result['trace']))
+
+    def test_second_refusal_is_error(self):
+        r1, r2 = final(''), final('')
+        r1['finish'] = r2['finish'] = 'refusal'
+        result = run_agent('x', FakeProvider([r1, r2]), StatusTools())
+        self.assertEqual(result['status'], 'error')
+
     def test_provider_exception_is_error_not_crash(self):
         class Down:
             def complete(self, messages, schemas):
