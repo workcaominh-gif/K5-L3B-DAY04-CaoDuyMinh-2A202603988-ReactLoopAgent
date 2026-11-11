@@ -183,6 +183,22 @@ def _evidence_ledger(trace):
     return '\n'.join(out)
 
 
+NOTE_LINE = re.compile(r'^\s*(Plan|Thought)\s*:', re.I)
+
+
+def _split_notes(answer):
+    """Hybrid trace: internal Plan/Thought lines belong in the trace, not in the user-facing answer.
+    Leading note lines (and their bullet continuations) are moved out of the final answer."""
+    lines = answer.splitlines()
+    notes, i = [], 0
+    while i < len(lines) and (NOTE_LINE.match(lines[i]) or (notes and lines[i].strip().startswith('-')) or (notes and not lines[i].strip())):
+        notes.append(lines[i])
+        i += 1
+    if not notes:
+        return answer, ''
+    return '\n'.join(lines[i:]).strip(), '\n'.join(n for n in notes if n.strip())
+
+
 def _mark_untrusted(result):
     """Add a trust boundary to the observation and flag instruction-like text found in the data."""
     marked = dict(result)
@@ -203,10 +219,10 @@ INCIDENT_LINK = re.compile(r'https?://[^\s)\]"\']+/incidents/([a-z0-9]{8,16})', 
 _POOL = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix='tool')
 
 
-def _preview(text):
+def _preview(text, limit=PREVIEW_CHARS):
     if not text:
         return ''
-    return text if len(text) <= PREVIEW_CHARS else text[:PREVIEW_CHARS] + '…'
+    return text if len(text) <= limit else text[:limit] + '…'
 
 
 def _parse_arguments(raw):
@@ -328,7 +344,7 @@ def run_agent(question, provider, tools, max_steps=6):
         finish = response.get('finish')
         usage.append(response.get('usage') or {})
         trace.append({'event': 'model', 'step': step, 'finish': finish,
-                      'thought': _preview(message.get('content')) if calls else '',
+                      'thought': _preview(message.get('content'), 800) if calls else '',
                       'actions': [{'name': c.get('name'), 'arguments': c.get('arguments')} for c in calls],
                       'content_preview': '' if calls else _preview(message.get('content'))})
         messages.append(message)
@@ -392,7 +408,9 @@ def run_agent(question, provider, tools, max_steps=6):
             trace.append({'event': 'error', 'step': step, 'error': f'UNEXPECTED_FINISH:{finish}'})
             return done('error', message.get('content') or '', f'Model stopped unexpectedly (finish={finish}).')
 
-        answer = message.get('content') or ''
+        answer, final_notes = _split_notes(message.get('content') or '')
+        if final_notes:
+            trace.append({'event': 'final_thought', 'step': step, 'thought': _preview(final_notes, 800)})
         # Evidence gate: mỗi provider đã đọc incident thành công phải có ít nhất 1 URL incident trong answer.
         missing = {p: sorted(urls) for p, urls in sources.items() if not any(u in answer for u in urls)}
         if missing:

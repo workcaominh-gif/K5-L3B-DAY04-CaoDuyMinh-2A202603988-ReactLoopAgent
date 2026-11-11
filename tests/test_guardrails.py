@@ -232,6 +232,15 @@ class EvidenceLedgerTests(unittest.TestCase):
 
 
 class HybridTraceTests(unittest.TestCase):
+    def test_leading_thought_moves_from_answer_to_trace(self):
+        result = run_agent('x', FakeProvider([final('Thought: enough evidence -> answer.\n\n**Kết luận:** ổn.')]), StatusTools())
+        self.assertEqual(result['answer'], '**Kết luận:** ổn.')
+        self.assertEqual(next(t for t in result['trace'] if t['event'] == 'final_thought')['thought'], 'Thought: enough evidence -> answer.')
+
+    def test_answer_without_notes_is_unchanged(self):
+        result = run_agent('x', FakeProvider([final('Kết luận: Thought là một từ.')]), StatusTools())
+        self.assertEqual(result['answer'], 'Kết luận: Thought là một từ.')
+
     def test_thought_and_action_recorded_for_tool_steps(self):
         step = tool_call('1', 'get_status', '{"provider":"github"}')
         step['message']['content'] = 'Thought: cần trạng thái GitHub trước.'
