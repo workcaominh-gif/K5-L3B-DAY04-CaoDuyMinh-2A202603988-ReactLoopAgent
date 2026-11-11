@@ -193,6 +193,44 @@ class RoleBoundaryTests(unittest.TestCase):
         self.assertIsNone(_re.search('[ạảấầẩẫậắằẳẵặẹẻẽếềểễệịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹđ]', fake.histories[0][0]['content']))
 
 
+class EvidenceLedgerTests(unittest.TestCase):
+    """v3: the final answer is written under a system prompt that carries a code-built evidence ledger."""
+    def run_case(self, tools, calls, answer='x'):
+        fake = FakeProvider(calls + [final(answer)])
+        return fake, run_agent('q', fake, tools, max_steps=8)
+
+    def test_ledger_reaches_system_prompt_after_tool_call(self):
+        fake, result = self.run_case(StatusTools(), [tool_call('1', 'get_status', '{"provider":"github","component":"Actions"}')])
+        self.assertNotIn('Computed by the agent runtime', fake.histories[0][0]['content'])
+        self.assertIn('Computed by the agent runtime', fake.histories[1][0]['content'])
+        self.assertIn('Incidents only LISTED', fake.histories[1][0]['content'])
+        self.assertEqual(result['evidence_ledger'], fake.histories[1][0]['content'].split('\n\n')[-1])
+
+    def test_omitted_updates_are_counted(self):
+        fake, result = self.run_case(StatusTools(), [tool_call('1', 'get_incident_details', '{"provider":"github","incident_id":"t89g2q1800fr"}')],
+                                     'https://stspg.io/lv4q3xm9r0rk')
+        self.assertIn('updates_received=3 of updates_total=4', result['evidence_ledger'])
+        self.assertIn('only 3 of 4 updates were returned', result['evidence_ledger'])
+
+    def test_injected_fields_never_reach_the_ledger(self):
+        sys.path.insert(0, str(ROOT / 'evals'))
+        from scenarios import ScenarioTools
+        fake, result = self.run_case(ScenarioTools('status_injection'), [tool_call('1', 'get_status', '{"provider":"github","component":"Actions"}')])
+        self.assertIn('external_notice', fake.histories[1][-1]['content'])  # the raw observation still has it
+        self.assertNotIn('STATUS_OVERRIDE_CONFIRMED', result['evidence_ledger'])
+
+    def test_failures_are_unknown_not_up(self):
+        sys.path.insert(0, str(ROOT / 'evals'))
+        from scenarios import ScenarioTools
+        _, result = self.run_case(ScenarioTools('cloudflare_timeout'), [tool_call('1', 'get_status', '{"provider":"cloudflare"}')])
+        self.assertIn('Could NOT be checked', result['evidence_ledger'])
+        self.assertIn('TimeoutError', result['evidence_ledger'])
+
+    def test_bonus_pagination_is_reported(self):
+        _, result = self.run_case(BonusTools(), [tool_call('1', 'get_incident_details', '{"provider":"vercel","incident_id":"sps6n39gm4sg"}')], 'x')
+        self.assertIn('more updates exist after offset 2', result['evidence_ledger'])
+
+
 class HybridTraceTests(unittest.TestCase):
     def test_thought_and_action_recorded_for_tool_steps(self):
         step = tool_call('1', 'get_status', '{"provider":"github"}')
