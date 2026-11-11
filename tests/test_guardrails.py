@@ -71,6 +71,7 @@ class LoopGuardTests(unittest.TestCase):
         result = run_agent('x', fake, StatusTools(), max_steps=2)
         self.assertEqual(result['status'], 'completed')
         self.assertIn('[Agent runtime]', fake.histories[1][-1]['content'])
+        self.assertEqual(fake.histories[1][-1]['role'], 'system')
 
 
 class TimeoutAndErrorTests(unittest.TestCase):
@@ -121,6 +122,62 @@ class SourceGateTests(unittest.TestCase):
         result = run_agent('x', fake, StatusTools(), max_steps=6)
         gate = next(t for t in result['trace'] if t['event'] == 'validation_missing_source')
         self.assertEqual(list(gate['missing']), ['cloudflare'])
+
+
+class RoleBoundaryTests(unittest.TestCase):
+    """Bài Day 3: prompt có cấu trúc, mô tả tool rõ, ranh giới vai trò system/user/tool."""
+    def test_prompt_follows_slide_structure(self):
+        fake = FakeProvider([final()])
+        run_agent('x', fake, StatusTools())
+        system = fake.histories[0][0]
+        self.assertEqual(system['role'], 'system')
+        tags = ['<persona>', '<rules>', '<capabilities>', '<constraints>', '<output_format>', '<escalation>']
+        positions = [system['content'].index(t) for t in tags]
+        self.assertEqual(positions, sorted(positions))
+        self.assertEqual(fake.histories[0][1], {'role': 'user', 'content': 'x'})
+
+    def test_tool_descriptions_rewritten_but_contract_unchanged(self):
+        from status_tools import SCHEMAS
+        class Capture(FakeProvider):
+            def complete(self, messages, schemas):
+                self.seen = schemas
+                return super().complete(messages, schemas)
+        fake = Capture([final()])
+        run_agent('x', fake, StatusTools())
+        for ours, given in zip(fake.seen, SCHEMAS):
+            self.assertEqual(ours['function']['name'], given['function']['name'])
+            self.assertEqual(ours['function']['parameters'], given['function']['parameters'])
+            self.assertIn('DÙNG', ours['function']['description'])
+            self.assertIn('KHÔNG', ours['function']['description'])
+        self.assertNotIn('DÙNG', SCHEMAS[0]['function']['description'])  # không sửa schema gốc
+
+    def test_tool_output_is_marked_untrusted_and_injection_flagged(self):
+        sys.path.insert(0, str(ROOT / 'evals'))
+        from scenarios import ScenarioTools
+        fake = FakeProvider([tool_call('1', 'get_incident_details', '{"provider":"github","incident_id":"xr3myzj7ms51"}'),
+                             final('https://stspg.io/pjgptg3cfc6n')])
+        run_agent('x', fake, ScenarioTools('injection'))
+        observed = json.loads(fake.histories[1][-1]['content'])
+        self.assertIn('trust_boundary', observed)
+        self.assertTrue(observed['untrusted_instruction_detected'])
+
+    def test_clean_data_is_not_flagged(self):
+        fake = FakeProvider([tool_call('1', 'get_status', '{"provider":"github"}'), final()])
+        run_agent('x', fake, StatusTools())
+        self.assertNotIn('untrusted_instruction_detected', json.loads(fake.histories[1][-1]['content']))
+
+    def test_source_revision_request_is_system_role(self):
+        fake = FakeProvider([tool_call('1', 'get_incident_details', '{"provider":"github","incident_id":"xr3myzj7ms51"}'),
+                             final('thiếu'), final('https://stspg.io/pjgptg3cfc6n')])
+        run_agent('x', fake, StatusTools(), max_steps=4)
+        self.assertEqual(fake.histories[2][-1]['role'], 'system')
+        self.assertTrue(all(m['role'] != 'user' for m in fake.histories[2][2:]))
+
+    def test_bonus_prompt_keeps_provider_context(self):
+        fake = FakeProvider([final()])
+        run_agent('x', fake, BonusTools())
+        self.assertIn('DigitalOcean', fake.histories[0][0]['content'])
+        self.assertIn('<constraints>', fake.histories[0][0]['content'])
 
 
 class HybridTraceTests(unittest.TestCase):
