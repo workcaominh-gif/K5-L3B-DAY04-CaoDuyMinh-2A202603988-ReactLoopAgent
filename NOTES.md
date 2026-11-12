@@ -79,7 +79,7 @@ Nguyên nhân có thể có:
 **Sửa gì, ở đâu:**
 - Code trong `agent.py`.
 - Prompt trong `prompts/`.
-- Test trong `tests/test_guardrails.py`: 29 test mới; toàn bộ `tests/` có 66 test, tất cả OK.
+- Test trong `tests/test_guardrails.py`: 29 test mới. Sau khi merge bản cập nhật mới nhất của đề (thêm provider OpenCode Go và test trong `tests/test_lab.py`), `python3 -m unittest discover -s tests -v` chạy 69 test, tất cả OK; bonus 3 test OK.
 - Không sửa `status_tools.py`, `fixtures/`, `evals/` hay rubric.
 
 **a. Agent hybrid ReAct + native function calling:**
@@ -194,7 +194,7 @@ So với các lần chạy bonus trước: agent v1 đạt 94.0 và agent v2 đ�
 `viewer/index.html` là trang tĩnh, không gọi API. Trang đọc `version_log.csv` và các file eval, và có:
 - Biểu đồ điểm v0 → v7.
 - Bấm một phiên bản để so từng case với baseline v0.
-- Trace từng step: Plan và Thought (tiếng Anh) → tool + arguments → observation → câu trả lời.
+- Trace theo đúng dạng ReAct của slide Day 4: **Thought n → Action n → Observation n → … → Final Answer** (Thought là ghi chú tiếng Anh của model, Action là tool + arguments qua function calling, Observation là tool result). Các guardrail (evidence gate, retry, loop guard) hiện thành dòng Safeguard.
 - Nhận xét và đề xuất của judge, evidence ledger, và nhãn `no src` cho câu trả lời thiếu nguồn.
 
 ```bash
